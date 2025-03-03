@@ -5,9 +5,10 @@ import Image from "next/image";
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
-  // For development purposes, redirect to our dashboard to see the layout
-  redirect("/dashboard");
+  // We can't redirect to dashboard anymore since it doesn't exist
+  // We can't redirect to (dashboard) either since that's not a real URL path
   
-  // This won't be reached due to the redirect, but it's here for reference
+  // Instead, let's just pass through - the app/(dashboard)/page.tsx content will
+  // appear at the root URL ("/") because route groups don't affect URL structure
   return null;
 }
