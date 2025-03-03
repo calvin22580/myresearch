@@ -1,68 +1,75 @@
-import { syncUserWithClerk } from "./lib/repositories/user-repository";
-import { db } from "./db/db";
-import { users, userPreferences, userCredits } from "./db/schema";
-import { eq } from "drizzle-orm";
-
 /**
- * Script to test the sync user with database function
+ * User Sync Test Script
+ * 
+ * Tests the synchronization of a mock Clerk user with the database.
+ * Ensures the creation of user preferences and credits works correctly.
+ * 
  * Run with: npx tsx test-user-sync.ts
  */
+
+import { db } from "./db/db";
+import { syncUserWithClerk } from "./lib/repositories/user-repository";
+import { and, eq } from "drizzle-orm";
+import { users } from "./db/schema/prepare-schema";
+
 async function testUserSync() {
   console.log("Testing user sync with Clerk...");
   
+  // Create a mock Clerk user
+  const mockClerkUser = {
+    id: "test_" + Date.now().toString(),
+    emailAddresses: [
+      {
+        emailAddress: `test-${Date.now()}@example.com`,
+        id: "test_email_id",
+        verification: { status: "verified" },
+      },
+    ],
+    firstName: "Test",
+    lastName: "User",
+    imageUrl: "https://example.com/image.jpg",
+    hasImage: true,
+  };
+
+  console.log("Mock Clerk user:", mockClerkUser);
+
   try {
-    // Create a mock Clerk user
-    const mockClerkUser = {
-      id: `clk_test_${Date.now()}`,
-      emailAddresses: [{ emailAddress: `test.${Date.now()}@example.com` }],
-      firstName: "Test",
-      lastName: "User",
-      imageUrl: "https://example.com/image.jpg",
-    };
-    
-    console.log("Mock Clerk user:", mockClerkUser);
-    
-    // Call the sync function
-    console.log("Syncing user...");
-    
-    const syncedUser = await syncUserWithClerk(mockClerkUser);
-    console.log("Synced user:", syncedUser);
-    
-    // Check if user was created in the database
-    if (syncedUser) {
-      console.log("User was successfully synced with the database!");
-      
-      // Query to check if user exists in the database
-      const user = await db.query.users.findFirst({
-        where: eq(users.clerkId, mockClerkUser.id),
+    // Sync the user with the database
+    const result = await syncUserWithClerk(mockClerkUser);
+    console.log("User sync result:", result);
+
+    // Verify user was created correctly
+    const createdUser = await db.query.users.findFirst({
+      where: eq(users.clerkId, mockClerkUser.id),
+      with: {
+        preferences: true,
+        credits: true,
+      },
+    });
+
+    if (createdUser) {
+      console.log("User created successfully:", {
+        id: createdUser.id,
+        email: createdUser.email,
+        displayName: createdUser.displayName,
+        credits: createdUser.credits,
+        preferences: createdUser.preferences,
       });
-      
-      console.log("User in database:", user);
-      
-      // Check if user preferences were created
-      if (user) {
-        const preferences = await db.query.userPreferences.findFirst({
-          where: eq(userPreferences.userId, user.id),
-        });
-        
-        console.log("User preferences:", preferences);
-        
-        // Check if user credits were created
-        const credits = await db.query.userCredits.findFirst({
-          where: eq(userCredits.userId, user.id),
-        });
-        
-        console.log("User credits:", credits);
-      }
     } else {
-      console.error("Failed to sync user with the database");
+      console.error("Failed to find created user");
     }
   } catch (error) {
-    console.error("Error syncing user:", error);
-    
-    // Print error stack trace for debugging
+    console.error("Error during user sync test:", error);
     if (error instanceof Error) {
       console.error(error.stack);
+    }
+  } finally {
+    // Clean up test user to prevent test data accumulation
+    try {
+      await db.delete(users).where(eq(users.clerkId, mockClerkUser.id));
+      console.log("Test user cleaned up");
+    } catch (cleanupError) {
+      console.error("Error cleaning up test user:", cleanupError);
     }
   }
 }
