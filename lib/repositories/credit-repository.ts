@@ -20,8 +20,20 @@ export async function getUserCredits(userId: string) {
 
 /**
  * Initialize credits for a new user
+ * This is now idempotent - it will only create credits if they don't already exist
  */
 export async function initializeUserCredits(userId: string, initialBalance = 10) {
+  // Check if user already has credits
+  const existingCredits = await db.query.userCredits.findFirst({
+    where: eq(userCredits.userId, userId),
+  });
+  
+  if (existingCredits) {
+    console.log(`User ${userId} already has credits (balance: ${existingCredits.balance}), skipping initialization`);
+    return existingCredits;
+  }
+  
+  // Create credits only if they don't exist
   const [userCredit] = await db.insert(userCredits)
     .values({
       userId,
@@ -33,6 +45,7 @@ export async function initializeUserCredits(userId: string, initialBalance = 10)
   // Create a transaction record for the initial credits
   await addCreditTransaction(userId, initialBalance, null, "Initial free credits");
   
+  console.log(`Initialized credits for user ${userId} with balance ${initialBalance}`);
   return userCredit;
 }
 
