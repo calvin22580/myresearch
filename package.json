@@ -20,7 +20,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.40.0",
     "lucide-react": "^0.476.0",
-    "next": "15.2.1-canary.0",
+    "next": "15.2.0",
     "pg": "^8.13.3",
     "postgres": "^3.4.5",
     "react": "^19.0.0",
@@ -37,7 +37,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.30.5",
     "eslint": "^9",
-    "eslint-config-next": "15.2.1-canary.0",
+    "eslint-config-next": "15.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
