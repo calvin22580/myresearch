@@ -116,8 +116,6 @@ Apply when planning new feature implementation or understanding the project road
 
     - `components/auth/auth-shell.tsx`: Layout shell for auth pages
 
-    - `components/auth/organization-switcher.tsx`: Organization switching component (if needed)
-
     - `hooks/use-auth.ts`: Custom hook for common auth operations
 
     - `styles/clerk-theme.css`: Custom styles for Clerk components

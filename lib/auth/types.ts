@@ -3,9 +3,9 @@ export interface ClerkUserData {
   email_addresses: {
     email_address: string;
     id: string;
-    verification: {
+    verification?: {
       status: string;
-    };
+    } | null;
   }[];
   first_name: string | null;
   last_name: string | null;
