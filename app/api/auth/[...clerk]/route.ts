@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   request: Request,
-  { params }: { params: { clerk: string[] } }
+  context: { params: { clerk: string[] } }
 ) {
+  const { params } = context;
+  
   // This can be expanded in the future for custom auth endpoints
   // For now, we'll just return a simple response
   
