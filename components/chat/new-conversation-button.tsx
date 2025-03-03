@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,121 +13,79 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useConversations } from "@/hooks/use-conversations";
 import { DomainSelector } from "./domain-selector";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { VariantProps } from "class-variance-authority";
-import { Loader2 } from "lucide-react";
+import { getDefaultDomain } from "@/lib/pinecone/knowledge-domains";
 
-interface NewConversationButtonProps extends VariantProps<typeof Button> {
-  children?: ReactNode;
-  className?: string;
-}
-
-export function NewConversationButton({
-  children,
-  variant = "outline",
-  size = "default",
-  className,
-  ...props
-}: NewConversationButtonProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function NewConversationButton() {
+  const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
-  const [selectedDomain, setSelectedDomain] = useState<string | undefined>(undefined);
-  const { createConversation, isCreating } = useConversations();
-
+  const [domain, setDomain] = useState(getDefaultDomain().id);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { createConversation } = useConversations();
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!message.trim()) return;
     
     try {
-      await createConversation(message, selectedDomain);
-      setIsOpen(false);
+      setIsSubmitting(true);
+      await createConversation(message, domain);
+      setOpen(false);
       setMessage("");
-      setSelectedDomain(undefined);
+      setDomain(getDefaultDomain().id);
     } catch (error) {
       console.error("Failed to create conversation:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
+  
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant={variant} 
-          size={size} 
-          className={cn("gap-2", className)}
-          {...props}
-        >
-          {children || (
-            <>
-              <Plus className="h-4 w-4" />
-              <span>New Conversation</span>
-            </>
-          )}
+        <Button className="w-full" size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          New Conversation
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Start a New Conversation</DialogTitle>
+          <DialogTitle>New Conversation</DialogTitle>
           <DialogDescription>
-            Enter your research question to start a new conversation.
+            Start a new conversation by asking a question or describing what you want to know.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="domain">Knowledge Domain</Label>
-            <DomainSelector 
-              domain={selectedDomain} 
-              onSelect={setSelectedDomain} 
-              className="w-full"
-              buttonVariant="outline"
-              buttonSize="default"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Select a domain to narrow down the knowledge base for more relevant answers.
-            </p>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="message">Your message</Label>
+              <Textarea
+                id="message"
+                placeholder="How do Building Regulations affect basement conversions in London?"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="domain">Knowledge domain</Label>
+              <DomainSelector 
+                domain={domain} 
+                onSelect={setDomain}
+                className="w-full"
+              />
+            </div>
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="message">Your Question</Label>
-            <Textarea
-              id="message"
-              placeholder="Enter your research question here..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[120px]"
-              required
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Be specific with your question to get the most relevant answers.
-            </p>
-          </div>
-          
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsOpen(false)}
-              disabled={isCreating}
-            >
-              Cancel
-            </Button>
             <Button 
-              type="submit"
-              disabled={!message.trim() || isCreating}
+              type="submit" 
+              disabled={!message.trim() || isSubmitting}
             >
-              {isCreating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Start Conversation"
-              )}
+              {isSubmitting ? "Creating..." : "Start conversation"}
             </Button>
           </DialogFooter>
         </form>
