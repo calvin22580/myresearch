@@ -1,6 +1,6 @@
 import { db } from "@/db/db";
 import { citations, messages, pdfs } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 /**
  * Get citation by ID
@@ -118,7 +118,7 @@ export async function deleteCitation(id: string) {
  */
 export async function isPdfReferenced(pdfId: string) {
   const count = await db
-    .select({ count: db.fn.count() })
+    .select({ count: sql`count(*)` })
     .from(citations)
     .where(eq(citations.pdfId, pdfId));
   
@@ -132,7 +132,7 @@ export async function getCitationCountsByPdf() {
   const counts = await db
     .select({
       pdfId: citations.pdfId,
-      count: db.fn.count(),
+      count: sql`count(*)`,
     })
     .from(citations)
     .groupBy(citations.pdfId);

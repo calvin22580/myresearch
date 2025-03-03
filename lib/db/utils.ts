@@ -1,5 +1,5 @@
 import { db } from "@/db/db";
-import { SQL } from "drizzle-orm";
+import { SQL, sql } from "drizzle-orm";
 
 /**
  * Execute a database transaction with automatic rollback on error
@@ -22,7 +22,7 @@ export async function exists<T extends { id: string }>(
   table: any,
   condition: SQL<unknown>
 ): Promise<boolean> {
-  const result = await db.select({ exists: db.fn.count().gt(0) }).from(table).where(condition);
+  const result = await db.select({ exists: sql`count(*) > 0` }).from(table).where(condition);
   return !!result[0]?.exists;
 }
 
@@ -33,7 +33,7 @@ export async function count(
   table: any,
   condition?: SQL<unknown>
 ): Promise<number> {
-  const query = db.select({ count: db.fn.count() }).from(table);
+  const query = db.select({ count: sql`count(*)` }).from(table);
   
   if (condition) {
     query.where(condition);
