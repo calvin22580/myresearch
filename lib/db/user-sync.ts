@@ -38,18 +38,15 @@ export async function syncUserWithDatabase(userData: ClerkUserData): Promise<voi
     } else {
       // Create new user
       console.log(`Creating new user with Clerk ID: ${userData.id}`);
-      const newUser = await createUser({
+      await createUser({
         clerkId: userData.id,
         email,
         displayName: displayName || undefined,
         avatarUrl: userData.image_url || undefined,
       });
-
-      // Initialize credits for new user (5 free credits)
-      if (newUser) {
-        console.log(`Initializing credits for new user: ${newUser.id}`);
-        await initializeUserCredits(newUser.id, 5);
-      }
+      
+      // User credits are already initialized in createUser, no need to do it again
+      console.log(`Credits initialized during user creation for Clerk ID: ${userData.id}`);
     }
 
     console.log(`User sync completed for Clerk ID: ${userData.id}`);

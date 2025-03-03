@@ -32,7 +32,7 @@ export const userPreferences = pgTable("user_preferences", {
 // User credits table
 export const userCredits = pgTable("user_credits", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
   balance: integer("balance").notNull().default(0),
   lastRefresh: timestamp("last_refresh"),
   createdAt: timestamp("created_at").defaultNow(),
