@@ -1,6 +1,6 @@
 import { db } from "@/db/db";
 import { pdfs } from "@/db/schema";
-import { eq, like, ilike, inArray } from "drizzle-orm";
+import { eq, like, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 /**
  * Get a PDF by its ID
@@ -109,7 +109,7 @@ export async function deletePdf(id: string) {
 export async function getPdfDomains() {
   const results = await db.select({ domain: pdfs.domain })
     .from(pdfs)
-    .where(pdfs.domain.isNotNull())
+    .where(isNotNull(pdfs.domain))
     .groupBy(pdfs.domain);
   
   return results.map(r => r.domain).filter(Boolean) as string[];
