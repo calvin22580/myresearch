@@ -60,9 +60,16 @@ export async function POST(request: NextRequest) {
     
     const { message, domainId } = validation.data;
     
-    const newConversation = await createConversation(message, domainId);
-    
-    return NextResponse.json(newConversation, { status: 201 });
+    try {
+      const newConversation = await createConversation(message, domainId);
+      return NextResponse.json(newConversation, { status: 201 });
+    } catch (err) {
+      console.error('Detailed creation error:', err);
+      return NextResponse.json(
+        { message: `Failed to create conversation: ${err instanceof Error ? err.message : String(err)}` },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('POST /api/conversations error:', error);
     

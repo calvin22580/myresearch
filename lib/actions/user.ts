@@ -6,6 +6,9 @@ import { getUserByClerkId, getUserById, updateUser, deleteUser } from "@/lib/rep
 import { UpdateProfileInput, UserProfile } from "@/types/user";
 import { redirect } from "next/navigation";
 import { User, UserPreference } from "@/types/db";
+import { db } from '@/db/db';
+import { users } from '@/db/schema/prepare-schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * Get the current user's profile data
@@ -137,4 +140,47 @@ function mapUserToProfile(user: User, preferences: UserPreference): UserProfile 
       updatedAt: preferences.updatedAt,
     }
   };
+}
+
+/**
+ * Ensures a user exists in the database
+ * If the user doesn't exist, creates a new record from Clerk data
+ */
+export async function ensureUserExists() {
+  const { userId: clerkId } = await auth();
+  
+  if (!clerkId) {
+    throw new Error('Unauthorized: No user found in authentication context');
+  }
+
+  // Check if user already exists
+  const existingUser = await db.query.users.findFirst({
+    where: eq(users.clerkId, clerkId),
+  });
+
+  if (existingUser) {
+    console.log('User already exists in database:', existingUser.id);
+    return existingUser;
+  }
+
+  // User doesn't exist, create a new record
+  console.log('Creating new user record for Clerk ID:', clerkId);
+  
+  // In a real application, you should also fetch user details from the Clerk API
+  // and populate all required fields like email, name, etc.
+  const [newUser] = await db.insert(users)
+    .values({
+      id: clerkId, // Using the clerk ID as our primary key for simplicity
+      clerkId: clerkId,
+      email: `user-${clerkId.substring(0, 8)}@example.com`, // Placeholder email
+      displayName: `User ${clerkId.substring(0, 5)}`, // Placeholder name
+    })
+    .returning();
+
+  if (!newUser) {
+    throw new Error('Failed to create user record');
+  }
+  
+  console.log('Created new user:', newUser.id);
+  return newUser;
 } 

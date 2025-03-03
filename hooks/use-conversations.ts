@@ -45,12 +45,34 @@ export function useConversations() {
     }
   }, []);
 
+  // Ensure user exists in database
+  const ensureUserSynced = useCallback(async () => {
+    try {
+      const response = await fetch('/api/user/sync');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to sync user');
+      }
+      return true;
+    } catch (err) {
+      console.error('Error syncing user:', err);
+      toast.error('User synchronization failed');
+      return false;
+    }
+  }, []);
+
   // Create a new conversation
   const createConversation = useCallback(async (
     message: string, 
     domainId?: string
   ) => {
     try {
+      // First ensure user is synced
+      const userSynced = await ensureUserSynced();
+      if (!userSynced) {
+        throw new Error('User synchronization failed. Please try again.');
+      }
+
       const response = await fetch('/api/conversations', {
         method: 'POST',
         headers: {
@@ -78,10 +100,10 @@ export function useConversations() {
       return newConversation;
     } catch (err) {
       console.error('Error creating conversation:', err);
-      toast.error('Failed to create conversation');
+      toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
       throw err;
     }
-  }, [router]);
+  }, [router, ensureUserSynced]);
 
   // Delete a conversation
   const deleteConversation = useCallback(async (id: string) => {

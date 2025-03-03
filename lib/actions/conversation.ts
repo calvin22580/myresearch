@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { generateErrorMessage } from '@/lib/utils';
 import { rateLimit } from '@/lib/rate-limit';
 import { getKnowledgeDomain } from '@/lib/pinecone/knowledge-domains';
+import { ensureUserExists } from '@/lib/actions/user';
 
 /**
  * Creates a new conversation with a default title based on the first message.
@@ -23,11 +24,13 @@ export async function createConversation(
   domainId?: string
 ) {
   try {
-    const { userId } = await auth();
+    // First ensure that the user exists in our database
+    const user = await ensureUserExists();
+    const userId = user.id;
 
-    if (!userId) {
-      throw new Error('Unauthorized');
-    }
+    console.log('Creating conversation for user:', userId);
+    console.log('With message:', message);
+    console.log('With domain:', domainId);
 
     // Rate limit checks
     const identifier = `create-conversation:${userId}`;
@@ -51,58 +54,69 @@ export async function createConversation(
     }
 
     // Create conversation in transaction to ensure both conversation and initial message are created
-    const result = await db.transaction(async (tx) => {
-      // Generate IDs
-      const conversationId = nanoid();
-      const messageId = nanoid();
-      
-      // Insert the conversation
-      const [conversation] = await tx
-        .insert(conversations)
-        .values({
-          id: conversationId,
-          userId,
-          domain: domainId, // Use domain field instead of domainId
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Generate IDs
+        const conversationId = nanoid();
+        const messageId = nanoid();
+        
+        console.log('Generated IDs:', { conversationId, messageId });
+        
+        // Insert the conversation
+        const [conversation] = await tx
+          .insert(conversations)
+          .values({
+            id: conversationId,
+            userId,
+            domain: domainId, // Use domain field instead of domainId
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      if (!conversation) {
-        throw new Error('Failed to create conversation');
-      }
+        if (!conversation) {
+          throw new Error('Failed to create conversation record');
+        }
 
-      // Insert the initial message
-      const [initialMessage] = await tx
-        .insert(messages)
-        .values({
-          id: messageId,
-          conversationId: conversation.id,
-          content: message,
-          role: 'user',
-          createdAt: new Date(),
-        })
-        .returning();
+        console.log('Created conversation:', conversation);
 
-      if (!initialMessage) {
-        throw new Error('Failed to add initial message');
-      }
+        // Insert the initial message
+        const [initialMessage] = await tx
+          .insert(messages)
+          .values({
+            id: messageId,
+            conversationId: conversation.id,
+            content: message,
+            role: 'user',
+            createdAt: new Date(),
+          })
+          .returning();
 
+        if (!initialMessage) {
+          throw new Error('Failed to add initial message');
+        }
+
+        console.log('Created initial message:', initialMessage);
+
+        return {
+          conversation,
+          initialMessage,
+        };
+      });
+
+      // Revalidate paths
+      revalidatePath('/conversations');
+      revalidatePath(`/conversations/${result.conversation.id}`);
+
+      // Return the created conversation with the first message as preview
       return {
-        conversation,
-        initialMessage,
+        ...result.conversation,
+        preview: result.initialMessage.content,
       };
-    });
-
-    // Revalidate paths
-    revalidatePath('/conversations');
-    revalidatePath(`/conversations/${result.conversation.id}`);
-
-    // Return the created conversation with the first message as preview
-    return {
-      ...result.conversation,
-      preview: result.initialMessage.content,
-    };
+    } catch (dbError) {
+      console.error('Database transaction error:', dbError);
+      throw new Error(`Database error: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
+    }
   } catch (error) {
     console.error('Error creating conversation:', error);
     throw new Error(generateErrorMessage(error));

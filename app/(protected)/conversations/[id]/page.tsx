@@ -1,8 +1,8 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DomainSelector } from "@/components/chat/domain-selector";
-import { getConversationById, updateConversationDomain } from "@/lib/actions/conversation";
-import { getDomainById, getDefaultDomain } from "@/lib/knowledge-domains";
+import { getConversation, updateConversationDomain } from "@/lib/actions/conversation";
+import { getKnowledgeDomain, getDefaultDomain } from "@/lib/pinecone/knowledge-domains";
 
 export async function generateMetadata({
   params,
@@ -10,15 +10,15 @@ export async function generateMetadata({
   params: { id: string };
 }): Promise<Metadata> {
   try {
-    const conversation = await getConversationById(params.id);
+    const conversation = await getConversation(params.id);
     return {
       title: `${conversation.title} - My-Research.ai`,
-      description: "Conversation with knowledge assistant",
+      description: "Conversation with My-Research.ai knowledge assistant",
     };
   } catch (error) {
     return {
       title: "Conversation - My-Research.ai",
-      description: "Conversation with knowledge assistant",
+      description: "Conversation with My-Research.ai knowledge assistant",
     };
   }
 }
@@ -29,40 +29,34 @@ export default async function ConversationPage({
   params: { id: string };
 }) {
   try {
-    const conversation = await getConversationById(params.id);
-    const domainInfo = getDomainById(conversation.domain) || getDefaultDomain();
+    const conversation = await getConversation(params.id);
+    const domainInfo = getKnowledgeDomain(conversation.domain) || getDefaultDomain();
     
-    const handleDomainChange = async (newDomain: string) => {
+    const handleDomainChange = async (domain: string) => {
       "use server";
-      await updateConversationDomain(params.id, newDomain);
+      await updateConversationDomain(params.id, domain);
     };
-    
+
     return (
       <div className="flex h-full flex-col">
         <div className="flex-1 overflow-hidden">
           <div className="container h-full py-6">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold truncate">
-                {conversation.title}
+            <div className="mb-8 flex justify-between items-center">
+              <h1 className="text-2xl font-bold">
+                {conversation.title || "New Conversation"}
               </h1>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Knowledge domain:</span>
-                <DomainSelector
-                  domain={conversation.domain}
-                  onSelect={handleDomainChange}
-                />
-              </div>
+              <DomainSelector
+                domain={domainInfo.id}
+                onSelect={handleDomainChange}
+              />
             </div>
-            
-            {/* Placeholder for chat messages - will be implemented in Step 8 */}
-            <div className="rounded-lg border h-[calc(100vh-10rem)] flex items-center justify-center">
-              <div className="text-center p-8">
-                <h2 className="text-xl font-semibold mb-2">Chat Interface Coming Soon</h2>
-                <p className="text-muted-foreground max-w-md">
-                  The chat interface will be implemented in Step 8 of our implementation plan.
-                  This page currently shows the conversation title and allows changing the knowledge domain.
-                </p>
-              </div>
+            <div className="rounded-md border p-8 text-center">
+              <h2 className="text-xl font-semibold mb-4">
+                Chat Interface Coming Soon
+              </h2>
+              <p className="text-muted-foreground">
+                The chat interface will be implemented in the next step.
+              </p>
             </div>
           </div>
         </div>
