@@ -1,5 +1,5 @@
 import { db } from "@/db/db";
-import { users, userPreferences } from "@/db/schema";
+import { users, userPreferences, userCredits } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 /**
@@ -55,6 +55,13 @@ export async function createUser(data: {
       theme: "light",
       defaultDomain: "building-regulations",
       contextWindow: 5,
+    });
+  
+  // Create initial user credits
+  await db.insert(userCredits)
+    .values({
+      userId,
+      balance: 10,
     });
   
   return getUserById(userId);
@@ -138,4 +145,54 @@ export async function updateUserPreferences(
 export async function deleteUser(id: string) {
   // All related data will be deleted via foreign key cascades
   await db.delete(users).where(eq(users.id, id));
+}
+
+/**
+ * Sync a user from Clerk to the database
+ * Creates a new user if they don't exist, or updates their information if they do
+ */
+export async function syncUserWithClerk(clerkUser: {
+  id: string;
+  emailAddresses: Array<{ emailAddress: string }>;
+  firstName?: string | null;
+  lastName?: string | null;
+  imageUrl?: string | null;
+}) {
+  try {
+    // Check if user already exists
+    const existingUser = await getUserByClerkId(clerkUser.id);
+    
+    // Convert null to undefined for proper type compatibility
+    const avatarUrl = clerkUser.imageUrl === null ? undefined : clerkUser.imageUrl;
+    
+    // If user exists, update their information
+    if (existingUser) {
+      const email = clerkUser.emailAddresses[0]?.emailAddress;
+      const displayName = [clerkUser.firstName, clerkUser.lastName]
+        .filter(Boolean)
+        .join(" ") || undefined;
+      
+      return await updateUser(existingUser.id, {
+        email: email || existingUser.email,
+        displayName: displayName || existingUser.displayName,
+        avatarUrl,
+      });
+    }
+    
+    // Otherwise, create a new user
+    return await createUser({
+      clerkId: clerkUser.id,
+      email: clerkUser.emailAddresses[0]?.emailAddress || "",
+      displayName: [clerkUser.firstName, clerkUser.lastName]
+        .filter(Boolean)
+        .join(" "),
+      avatarUrl,
+    });
+  } catch (error) {
+    console.error("Error syncing user with Clerk:", error);
+    if (error instanceof Error) {
+      console.error(error.stack);
+    }
+    return null;
+  }
 } 

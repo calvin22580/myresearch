@@ -3,638 +3,262 @@ description: Database schema and Neon MCP server
 globs: db//*,lib/repositories//,lib/db/**/
 alwaysApply: false
 ---
-  
-
-**You have access to the Supabase MCP server
-
-  
-
-  Here are the tools you have available
-
-
-  
-
-  
-
-1. Database Schema Rule
-
-  
-
-  
 
 # Database Schema Implementation Rule
 
-  
-
-
-This rule provides guidance for implementing the database schema for My-Research.ai using Drizzle ORM with PostgreSQL.
-
-  
-
-  
+This rule provides guidance for implementing and maintaining the database schema for My-Research.ai using Drizzle ORM with PostgreSQL.
 
 ## When to Apply
 
-  
-
 Apply when working on database schema definition, migrations, or database access patterns.
-
-  
-
-  
 
 ## File Patterns
 
-  
-
 db/**/*
-
-  
-
 lib/repositories/**/*
-
-  
-
 lib/db/**/*
-
-  
-
-  
 
 ## Database Schema Overview
 
-  
-
-  
-
 My-Research.ai uses Drizzle ORM with a PostgreSQL database (Supabase). The schema consists of these core tables:
-
-  
-
-  
 
 ### Core Tables
 
-  
-
 - `users`: User data synchronized with Clerk authentication
-
-  
-
 - `user_preferences`: User settings including theme, default domain, context window size
-
-  
-
 - `conversations`: Chat conversations owned by users
-
-  
-
 - `messages`: Individual messages within conversations, with token usage tracking
-
-  
-
 - `user_credits`: Credit balance tracking for users
-
-  
-
 - `credit_transactions`: History of credit additions and deductions
-
-  
-
 - `subscription_plans`: Available subscription plan definitions
-
-  
-
 - `pdfs`: Metadata for PDF documents stored in Vercel Blob Storage
-
-  
-
 - `citations`: Links between messages and specific sections in PDFs
 
-  
-
-  
-
-### Database Schema Implementation
-
-  
-
-  
-
-```sql
-
-  
-
--- Users table
-
-  
-
-CREATE TABLE users (
-
-  
-
-  id TEXT PRIMARY KEY,
-
-  
-
-  clerk_id TEXT UNIQUE NOT NULL,
-
-  
-
-  email TEXT UNIQUE NOT NULL,
-
-  
-
-  display_name TEXT,
-
-  
-
-  avatar_url TEXT,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  
-
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- User preferences
-
-  
-
-CREATE TABLE user_preferences (
-
-  
-
-  id SERIAL PRIMARY KEY,
-
-  
-
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-  
-
-  theme TEXT DEFAULT 'light',
-
-  
-
-  default_domain TEXT DEFAULT 'building-regulations',
-
-  
-
-  context_window INTEGER DEFAULT 5,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  
-
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- Conversations
-
-  
-
-CREATE TABLE conversations (
-
-  
-
-  id TEXT PRIMARY KEY,
-
-  
-
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-  
-
-  title TEXT,
-
-  
-
-  domain TEXT,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  
-
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- Messages
-
-  
-
-CREATE TABLE messages (
-
-  
-
-  id TEXT PRIMARY KEY,
-
-  
-
-  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-
-  
-
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-
-  
-
-  content TEXT NOT NULL,
-
-  
-
-  tokens_used INTEGER,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- Citations
-
-  
-
-CREATE TABLE citations (
-
-  
-
-  id TEXT PRIMARY KEY,
-
-  
-
-  message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-
-  
-
-  pdf_id TEXT NOT NULL REFERENCES pdfs(id),
-
-  
-
-  page_number INTEGER,
-
-  
-
-  highlight_text TEXT,
-
-  
-
-  position INTEGER,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- PDFs
-
-  
-
-CREATE TABLE pdfs (
-
-  
-
-  id TEXT PRIMARY KEY,
-
-  
-
-  name TEXT NOT NULL,
-
-  
-
-  blob_url TEXT NOT NULL,
-
-  
-
-  description TEXT,
-
-  
-
-  domain TEXT,
-
-  
-
-  size INTEGER,
-
-  
-
-  pages INTEGER,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- User credits
-
-  
-
-CREATE TABLE user_credits (
-
-  
-
-  id SERIAL PRIMARY KEY,
-
-  
-
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-  
-
-  balance INTEGER NOT NULL DEFAULT 0,
-
-  
-
-  last_refresh TIMESTAMP,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  
-
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- Credit transactions
-
-  
-
-CREATE TABLE credit_transactions (
-
-  
-
-  id SERIAL PRIMARY KEY,
-
-  
-
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-  
-
-  amount INTEGER NOT NULL,
-
-  
-
-  message_id TEXT REFERENCES messages(id),
-
-  
-
-  description TEXT,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
--- Subscription plans
-
-  
-
-CREATE TABLE subscription_plans (
-
-  
-
-  id TEXT PRIMARY KEY,
-
-  
-
-  name TEXT NOT NULL,
-
-  
-
-  description TEXT,
-
-  
-
-  price DECIMAL(10, 2),
-
-  
-
-  credits_per_month INTEGER NOT NULL,
-
-  
-
-  active BOOLEAN DEFAULT true,
-
-  
-
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-  
-
-);
-
-  
-
-  
-
-Database Access Patterns
-
-  
-
-Use the repository pattern for database access:
-
-  
-
-  
-
-// Example repository pattern for conversations
-
-  
-
-// lib/repositories/conversation-repository.ts
-
-  
-
+## IMPORTANT: Consolidated Schema Approach
+
+To avoid circular dependencies and "referencedTable" errors, we use a consolidated schema approach:
+
+1. **All table definitions and relations are managed in a single file**: `db/schema/prepare-schema.ts`
+2. **This file exports a complete schema object** that includes all tables and their relations
+3. **The database client in `db/db.ts` imports this consolidated schema**
+4. **No individual import of tables or relations in the main database file**
+
+### Database Initialization (db/db.ts)
+
+```typescript
+import { config } from "dotenv"
+import { drizzle } from "drizzle-orm/postgres-js"
+import postgres from "postgres"
+import schema from "./schema/prepare-schema"
+
+// Load environment variables
+config({ path: ".env.local" })
+
+// Create database client
+console.log("[DB] Creating database client...");
+const client = postgres(process.env.DATABASE_URL!, {
+  ssl: {
+    rejectUnauthorized: false
+  },
+  prepare: false // Disable prefetch as it is not supported for "Transaction" pool mode
+})
+
+// Export configured database instance with consolidated schema
+console.log("[DB] Initializing database with consolidated schema...");
+console.log("[DB] Schema includes:", Object.keys(schema).join(", "));
+
+// Create and export the database instance
+export const db = drizzle(client, { schema })
+
+console.log("[DB] Database initialized successfully");
+```
+
+### Consolidated Schema (db/schema/prepare-schema.ts)
+
+```typescript
+/**
+ * This file prepares the schema and relations for Drizzle ORM
+ * It ensures all tables are loaded before attempting to define relations
+ */
+
+import { pgTable, text, serial, timestamp, integer, boolean, decimal } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+
+// Step 1: Define all tables directly in this file to avoid circular dependencies
+
+// Users table
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  clerkId: text("clerk_id").notNull().unique(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// User preferences table
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  theme: text("theme").default("light"),
+  defaultDomain: text("default_domain").default("building-regulations"),
+  contextWindow: integer("context_window").default(5),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// User credits table
+export const userCredits = pgTable("user_credits", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  lastRefresh: timestamp("last_refresh"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ... other table definitions ...
+
+// Step 2: Define relations after all tables are defined
+
+// User relations
+export const usersRelations = relations(users, ({ one, many }) => ({
+  preferences: one(userPreferences, {
+    fields: [users.id],
+    references: [userPreferences.userId],
+  }),
+  credits: one(userCredits, {
+    fields: [users.id],
+    references: [userCredits.userId],
+  }),
+  // ... other relations ...
+}));
+
+// ... other relations ...
+
+// Step 3: Export everything as a single schema object
+export default {
+  users,
+  userPreferences,
+  userCredits,
+  // ... other tables ...
+  usersRelations,
+  userPreferencesRelations,
+  // ... other relations ...
+};
+```
+
+## Guidelines for Updating the Schema
+
+### Adding a New Table
+
+1. Edit **ONLY** the `db/schema/prepare-schema.ts` file
+2. Add your new table definition with all columns
+3. Define relations for the new table in the same file
+4. Add the table and its relations to the default export
+5. Never create separate schema files for new tables
+
+Example:
+
+```typescript
+// In db/schema/prepare-schema.ts
+
+// Add new table definition
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Define relations
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
+// Then update the default export to include the new table and relations
+export default {
+  // ... existing tables and relations
+  notifications,
+  notificationsRelations,
+};
+```
+
+### Modifying an Existing Table
+
+1. Edit **ONLY** the table definition in `db/schema/prepare-schema.ts`
+2. If necessary, update relations in the same file
+3. Never create a separate file for schema changes
+
+### Testing Schema Changes
+
+1. Always run `npx tsx test-prepared-db.ts` after schema changes to verify relations
+2. Fix any errors before deploying
+3. Test specific entity relations using repository functions
+
+## Repository Pattern for Database Access
+
+Continue using the repository pattern for database access, but ensure repositories import tables from the consolidated schema:
+
+```typescript
+// CORRECT: Import from the prepared schema
 import { db } from "@/db/db";
-
-  
-
-import { conversations, messages } from "@/db/schema";
-
-  
-
+import { users, userPreferences } from "@/db/schema/prepare-schema";
 import { eq } from "drizzle-orm";
 
-  
+// Repository functions...
+```
 
-  
+## Common Issues and Solutions
 
-export async function getConversationById(id: string) {
+### "Cannot read properties of undefined (reading 'referencedTable')"
 
-  
+This error occurs when there are circular dependencies in table relations. The consolidated schema approach prevents this by:
+1. Defining all tables before any relations
+2. Keeping all definitions in a single file
+3. Exporting a complete schema object
 
-  return db.query.conversations.findFirst({
+### Type Mismatches in Foreign Keys
 
-  
+Ensure that column types match exactly between primary and foreign keys. For example, if `users.id` is `text`, then `userPreferences.userId` must also be `text`, not `integer`.
 
-    where: eq(conversations.id, id),
+## SQL Schema for Reference
 
-  
+For reference, here's the complete SQL schema:
 
-    with: {
+```sql
+-- Users table
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  clerk_id TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  display_name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-  
+-- User preferences
+CREATE TABLE user_preferences (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  theme TEXT DEFAULT 'light',
+  default_domain TEXT DEFAULT 'building-regulations',
+  context_window INTEGER DEFAULT 5,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-      messages: true,
+-- ... other table definitions ...
+```
 
-  
+## Database Access Patterns
 
-    },
+Continue using the repository pattern as before, but always ensure repositories import tables from the consolidated schema, not individual files.
 
-  
-
-  });
-
-  
-
-}
-
-  
-
-  
-
-export async function createConversation(userId: string, title: string) {
-
-  
-
-  const [conversation] = await db.insert(conversations)
-
-  
-
-    .values({
-
-  
-
-      id: crypto.randomUUID(),
-
-  
-
-      userId,
-
-  
-
-      title,
-
-  
-
-    })
-
-  
-
-    .returning();
-
-  
-
-  return conversation;
-
-  
-
-}
-
-  
-
-  
-
-Implementation Guidelines
-
-  
-
-  
-
-Use Drizzle ORM for type-safe database interactions
-
-  
-
-Create specific query functions for each use case
-
-  
-
-Handle transactions explicitly where needed
-
-  
-
-Use prepared statements for all queries
-
-  
-
-Implement proper error handling for database operations
-
-  
-
-Define clear relations between tables
-
-  
-
-Create indexes for columns used in WHERE clauses
-
-  
-
-Group related tables in their own schema files
-
-  
-
-Export a combined schema from the index.ts file**
+Remember: **Always use the consolidated schema approach to avoid circular dependencies and "referencedTable" errors.**

@@ -1,6 +1,6 @@
 import { syncUserWithClerk } from "./lib/repositories/user-repository";
 import { db } from "./db/db";
-import { users, userCredits } from "./db/schema";
+import { users, userPreferences, userCredits } from "./db/schema";
 import { eq } from "drizzle-orm";
 
 /**
@@ -42,7 +42,7 @@ async function testUserSync() {
       // Check if user preferences were created
       if (user) {
         const preferences = await db.query.userPreferences.findFirst({
-          where: eq(users.id, user.id),
+          where: eq(userPreferences.userId, user.id),
         });
         
         console.log("User preferences:", preferences);
