@@ -8,12 +8,12 @@ import { eq, desc } from "drizzle-orm";
 export async function getAllActivePlans() {
   return db.query.subscriptionPlans.findMany({
     where: eq(subscriptionPlans.active, true),
-    orderBy: (plans, { asc }) => [asc(plans.creditsPerMonth)],
+    orderBy: subscriptionPlans.creditsPerMonth,
   });
 }
 
 /**
- * Get a plan by its ID
+ * Get a subscription plan by ID
  */
 export async function getPlanById(id: string) {
   return db.query.subscriptionPlans.findFirst({
@@ -35,6 +35,8 @@ export async function createPlan(data: {
     .values({
       id: crypto.randomUUID(),
       ...data,
+      // Convert price to string if it exists
+      price: data.price !== undefined ? data.price.toString() : undefined,
       active: data.active !== undefined ? data.active : true,
     })
     .returning();
@@ -55,8 +57,17 @@ export async function updatePlan(
     active?: boolean;
   }
 ) {
+  // Create a new object without the price field
+  const { price, ...otherData } = data;
+  
+  // Add price as string if it exists
+  const updateData = {
+    ...otherData,
+    ...(price !== undefined ? { price: price.toString() } : {})
+  };
+  
   const [updatedPlan] = await db.update(subscriptionPlans)
-    .set(data)
+    .set(updateData)
     .where(eq(subscriptionPlans.id, id))
     .returning();
   
@@ -89,7 +100,7 @@ export async function initializeDefaultPlans() {
   const freePlan = {
     name: "Free",
     description: "Basic access with daily credit refresh",
-    price: 0,
+    price: "0",
     creditsPerMonth: 10,
     active: true,
   };
@@ -97,7 +108,7 @@ export async function initializeDefaultPlans() {
   const proPlan = {
     name: "Professional",
     description: "Unlimited access with priority support",
-    price: 19.99,
+    price: "19.99",
     creditsPerMonth: 1000,
     active: true,
   };
@@ -105,7 +116,7 @@ export async function initializeDefaultPlans() {
   const enterprisePlan = {
     name: "Enterprise",
     description: "Custom support and integration options",
-    price: 49.99,
+    price: "49.99",
     creditsPerMonth: 5000,
     active: true,
   };
