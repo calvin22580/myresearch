@@ -5,16 +5,16 @@ import { User } from "@/types/db";
 /**
  * Get the currently authenticated Clerk user ID
  */
-export function getCurrentClerkId(): string | null {
-  const { userId } = auth();
+export async function getCurrentClerkId(): Promise<string | null> {
+  const { userId } = await auth();
   return userId;
 }
 
 /**
  * Check if a user is authenticated with Clerk
  */
-export function isAuthenticated(): boolean {
-  const clerkId = getCurrentClerkId();
+export async function isAuthenticated(): Promise<boolean> {
+  const clerkId = await getCurrentClerkId();
   return !!clerkId;
 }
 

@@ -13,7 +13,7 @@ import { User, UserPreference } from "@/types/db";
  */
 export async function getCurrentUser(): Promise<UserProfile | null> {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     
     if (!clerkId) {
       return null;
@@ -55,25 +55,30 @@ export async function getUserProfileById(id: string): Promise<UserProfile | null
  */
 export async function updateCurrentUserProfile(data: UpdateProfileInput): Promise<UserProfile | null> {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     
     if (!clerkId) {
       return null;
     }
-
+    
     const user = await getUserByClerkId(clerkId);
-
-    if (!user) {
+    
+    if (!user || !user.preferences) {
       return null;
     }
-
-    const updatedUser = await updateUser(user.id, data);
-    const profile = await getUserProfileById(user.id);
     
-    // Revalidate profile page
-    revalidatePath("/profile");
+    const updatedUser = await updateUser(user.id, {
+      displayName: data.displayName,
+    });
     
-    return profile;
+    if (!updatedUser) {
+      return null;
+    }
+    
+    // Revalidate the profile page
+    revalidatePath('/profile');
+    
+    return mapUserToProfile(updatedUser, user.preferences);
   } catch (error) {
     console.error("Error updating user profile:", error);
     return null;
@@ -86,22 +91,22 @@ export async function updateCurrentUserProfile(data: UpdateProfileInput): Promis
  */
 export async function deleteCurrentUser(): Promise<boolean> {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     
     if (!clerkId) {
       return false;
     }
-
+    
     const user = await getUserByClerkId(clerkId);
-
+    
     if (!user) {
       return false;
     }
-
+    
     await deleteUser(user.id);
     
     // Redirect to home page
-    redirect("/");
+    redirect('/');
     
     return true;
   } catch (error) {

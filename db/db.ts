@@ -2,8 +2,6 @@ import { config } from "dotenv"
 import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 import * as schema from "./schema"
-// Import relations
-import "./schema/relations"
 
 // Load environment variables
 config({ path: ".env.local" })
@@ -18,3 +16,6 @@ const client = postgres(process.env.DATABASE_URL!, {
 
 // Export configured database instance with schema
 export const db = drizzle(client, { schema })
+
+// Import relations after db initialization to avoid circular dependencies
+import "./schema/relations"
