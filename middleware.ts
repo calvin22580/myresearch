@@ -1,12 +1,6 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware } from '@clerk/nextjs/server'
 
-// Use the function form of clerkMiddleware with debugging enabled
-export default clerkMiddleware(
-  (auth, req) => {
-    // Don't need to add protection logic yet since all routes are public by default
-  },
-  { debug: process.env.NODE_ENV === 'development' } // Enable debugging in development
-);
+export default clerkMiddleware()
 
 export const config = {
   matcher: [
@@ -15,4 +9,4 @@ export const config = {
     // Always run for API routes
     '/(api|trpc)(.*)',
   ],
-};
+}
