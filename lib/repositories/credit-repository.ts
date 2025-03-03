@@ -1,5 +1,5 @@
-import { db } from "@/db/db";
-import { userCredits, creditTransactions } from "@/db/schema";
+import { db } from "../../db/db";
+import { userCredits, creditTransactions } from "../../db/schema/prepare-schema";
 import { eq, desc, sql } from "drizzle-orm";
 
 /**

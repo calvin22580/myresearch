@@ -1,71 +1,87 @@
 /**
- * Script to test the prepared database approach with consolidated schema
+ * DB Relations Test Script
+ * 
+ * This script tests the database relations to ensure they are working correctly.
+ * It should be run after any schema changes to verify relations integrity.
+ * 
  * Run with: npx tsx test-prepared-db.ts
  */
 
-import { preparedDb } from './db/prepared-db';
+import { db } from "./db/db";
+import { and, eq } from "drizzle-orm";
 
 async function testPreparedDatabase() {
-  console.log("Testing prepared database with consolidated schema...");
+  console.log("Testing database relations with consolidated schema...");
   
   try {
-    // Test 1: Simple query without relations
-    console.log("\nTest 1: Simple SELECT without relations");
-    const allUsers = await preparedDb.query.users.findMany({
-      limit: 5,
-    });
-    console.log(`Found ${allUsers.length} users`);
-    
-    // Test 2: Users to User Preferences relation
+    // Test simple query to check user preferences relation
+    console.log("\nTesting user preferences relation...");
     try {
-      console.log("\nTest 2: Users to User Preferences relation");
-      const usersWithPreferences = await preparedDb.query.users.findFirst({
+      const preferences = await db.query.userPreferences.findFirst({
         with: {
-          preferences: true,
+          user: true,
         },
       });
-      console.log("Users to preferences relation works!");
-      console.log(usersWithPreferences ? "User found with preferences" : "No users found");
+      
+      if (preferences) {
+        console.log("User preferences relation works!");
+      } else {
+        console.log("No user preferences found, but query executed successfully.");
+      }
     } catch (error: any) {
-      console.error("Error with users-preferences relation:", error.message);
+      console.error("Error with user preferences relation:", error.message);
     }
     
-    // Test 3: Users to User Credits relation
+    // Test user credits relation
+    console.log("\nTesting user credits relation...");
     try {
-      console.log("\nTest 3: Users to User Credits relation");
-      const usersWithCredits = await preparedDb.query.users.findFirst({
+      const credits = await db.query.userCredits.findFirst({
         with: {
-          credits: true,
+          user: true,
         },
       });
-      console.log("Users to credits relation works!");
-      console.log(usersWithCredits ? "User found with credits" : "No users found");
+      
+      if (credits) {
+        console.log("User credits relation works!");
+      } else {
+        console.log("No user credits found, but query executed successfully.");
+      }
     } catch (error: any) {
-      console.error("Error with users-credits relation:", error.message);
+      console.error("Error with user credits relation:", error.message);
     }
     
-    // Test 4: Messages to Citations relation
+    // Test messages with citations
+    console.log("\nTesting messages with citations relation...");
     try {
-      console.log("\nTest 4: Messages to Citations relation");
-      const messagesWithCitations = await preparedDb.query.messages.findFirst({
+      const messages = await db.query.messages.findMany({
         with: {
-          citations: true,
+          citations: {
+            with: {
+              pdf: true,
+            },
+          },
         },
+        limit: 1,
       });
-      console.log("Messages to citations relation works!");
-      console.log(messagesWithCitations ? "Message found with citations" : "No messages found");
+      
+      if (messages.length > 0) {
+        console.log("Messages with citations relation works!");
+      } else {
+        console.log("No messages with citations found, but query executed successfully.");
+      }
     } catch (error: any) {
       console.error("Error with messages-citations relation:", error.message);
     }
     
-    console.log("\nAll prepared database tests completed!");
+    console.log("\nAll database relation tests completed!");
+    
   } catch (error) {
-    console.error("Error testing prepared database:", error);
+    console.error("General error during testing:", error);
     if (error instanceof Error) {
       console.error(error.stack);
     }
   }
 }
 
-// Run the test
+// Run the tests
 testPreparedDatabase().catch(console.error); 

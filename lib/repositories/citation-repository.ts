@@ -1,5 +1,5 @@
-import { db } from "@/db/db";
-import { citations, messages, pdfs } from "@/db/schema";
+import { db } from "../../db/db";
+import { citations, messages, pdfs } from "../../db/schema/prepare-schema";
 import { eq, and, sql } from "drizzle-orm";
 
 /**

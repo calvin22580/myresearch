@@ -5,14 +5,14 @@ import {
 import {
   users,
   userPreferences,
-  conversations,
-  messages,
   userCredits,
   creditTransactions,
-  subscriptionPlans,
+  conversations,
+  messages,
   pdfs,
   citations,
-} from "@/db/schema";
+  subscriptionPlans,
+} from "../db/schema/prepare-schema";
 
 // Types for selecting database records
 export type User = InferSelectModel<typeof users>;

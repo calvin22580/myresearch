@@ -4,261 +4,276 @@ globs: db//*,lib/repositories//,lib/db/**/
 alwaysApply: false
 ---
 
-# Database Schema Implementation Rule
+# Comprehensive Database Schema Rule
 
-This rule provides guidance for implementing and maintaining the database schema for My-Research.ai using Drizzle ORM with PostgreSQL.
+## Overview
 
-## When to Apply
+This rule provides guidance on working with the database schema in My-Research.ai. We use Drizzle ORM with PostgreSQL, following a consolidated schema approach to avoid circular dependencies.
 
-Apply when working on database schema definition, migrations, or database access patterns.
+## Schema Organization
 
-## File Patterns
+- Consolidated Schema: All tables and relations are defined in db/schema/prepare-schema.ts
 
-db/**/*
-lib/repositories/**/*
-lib/db/**/*
+- Database Client: The database client is configured in db/db.ts
 
-## Database Schema Overview
+- Documentation: See DATABASE-SCHEMA.md for detailed schema documentation
 
-My-Research.ai uses Drizzle ORM with a PostgreSQL database (Supabase). The schema consists of these core tables:
+## Key Principles
 
-### Core Tables
+1. Avoid Circular Dependencies
 
-- `users`: User data synchronized with Clerk authentication
-- `user_preferences`: User settings including theme, default domain, context window size
-- `conversations`: Chat conversations owned by users
-- `messages`: Individual messages within conversations, with token usage tracking
-- `user_credits`: Credit balance tracking for users
-- `credit_transactions`: History of credit additions and deductions
-- `subscription_plans`: Available subscription plan definitions
-- `pdfs`: Metadata for PDF documents stored in Vercel Blob Storage
-- `citations`: Links between messages and specific sections in PDFs
+- Define all tables first, then define relations
 
-## IMPORTANT: Consolidated Schema Approach
+- Import relations after database initialization
 
-To avoid circular dependencies and "referencedTable" errors, we use a consolidated schema approach:
+- Use the consolidated schema approach
 
-1. **All table definitions and relations are managed in a single file**: `db/schema/prepare-schema.ts`
-2. **This file exports a complete schema object** that includes all tables and their relations
-3. **The database client in `db/db.ts` imports this consolidated schema**
-4. **No individual import of tables or relations in the main database file**
+1. Schema Export Completeness
 
-### Database Initialization (db/db.ts)
+- Always ensure all schema tables are exported
 
-```typescript
-import { config } from "dotenv"
-import { drizzle } from "drizzle-orm/postgres-js"
-import postgres from "postgres"
-import schema from "./schema/prepare-schema"
+- Missing exports can cause Cannot read properties of undefined (reading 'referencedTable') errors
 
-// Load environment variables
-config({ path: ".env.local" })
+1. Proper Primary and Foreign Keys
 
-// Create database client
-console.log("[DB] Creating database client...");
-const client = postgres(process.env.DATABASE_URL!, {
-  ssl: {
-    rejectUnauthorized: false
-  },
-  prepare: false // Disable prefetch as it is not supported for "Transaction" pool mode
-})
+- Every table must have a primary key
 
-// Export configured database instance with consolidated schema
-console.log("[DB] Initializing database with consolidated schema...");
-console.log("[DB] Schema includes:", Object.keys(schema).join(", "));
+- All foreign keys must reference existing tables with correct field types
 
-// Create and export the database instance
-export const db = drizzle(client, { schema })
+- Use the references method with onDelete: "cascade" for most relations
 
-console.log("[DB] Database initialized successfully");
-```
+1. Consistent Naming Conventions
 
-### Consolidated Schema (db/schema/prepare-schema.ts)
+- Use camelCase for TypeScript variable names
 
-```typescript
-/**
- * This file prepares the schema and relations for Drizzle ORM
- * It ensures all tables are loaded before attempting to define relations
- */
+- Use snake_case for database column names
 
-import { pgTable, text, serial, timestamp, integer, boolean, decimal } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+- Be consistent with ID fields (either id or entityId)
 
-// Step 1: Define all tables directly in this file to avoid circular dependencies
+## Error Prevention and Resolution
 
-// Users table
+### Common Errors
+
+1. Cannot read properties of undefined (reading 'referencedTable')
+
+- Cause: Missing schema export or circular dependency
+
+- Solution: Ensure all tables are exported and use consolidated schema
+
+1. Circular Dependencies
+
+- Cause: Tables referencing each other in a circular manner
+
+- Solution: Use the proper import order in db.ts and consolidated schema approach
+
+### Import Order Example
+
+// CORRECT ORDER (Avoid Circular Dependencies)
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema/prepare-schema";
+
+// Create the database client
+const connectionString = process.env.DATABASE_URL || "";
+const client = postgres(connectionString, { ssl: 'require' });
+export const db = drizzle(client, { schema });
+
+// Log successful initialization
+console.log("Database initialized with tables:", Object.keys(schema));
+
+## Schema Definition Guidelines
+
+When defining schema tables, follow these patterns:
+
+// Table definition
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
-  clerkId: text("clerk_id").notNull().unique(),
   email: text("email").notNull().unique(),
   displayName: text("display_name"),
-  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// User preferences table
-export const userPreferences = pgTable("user_preferences", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  theme: text("theme").default("light"),
-  defaultDomain: text("default_domain").default("building-regulations"),
-  contextWindow: integer("context_window").default(5),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// User credits table
-export const userCredits = pgTable("user_credits", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  balance: integer("balance").notNull().default(0),
-  lastRefresh: timestamp("last_refresh"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// ... other table definitions ...
-
-// Step 2: Define relations after all tables are defined
-
-// User relations
-export const usersRelations = relations(users, ({ one, many }) => ({
-  preferences: one(userPreferences, {
-    fields: [users.id],
-    references: [userPreferences.userId],
-  }),
-  credits: one(userCredits, {
-    fields: [users.id],
-    references: [userCredits.userId],
-  }),
-  // ... other relations ...
+// Relations definition
+export const usersRelations = relations(users, ({ many }) => ({
+  preferences: many(userPreferences),
+  conversations: many(conversations),
 }));
 
-// ... other relations ...
+## Environment Configuration
 
-// Step 3: Export everything as a single schema object
-export default {
-  users,
-  userPreferences,
-  userCredits,
-  // ... other tables ...
-  usersRelations,
-  userPreferencesRelations,
-  // ... other relations ...
-};
-```
+- Use environment variables for connection credentials
 
-## Guidelines for Updating the Schema
+- Implement different connection settings for development/testing/production
 
-### Adding a New Table
+- Configure SSL appropriately for each environment
 
-1. Edit **ONLY** the `db/schema/prepare-schema.ts` file
-2. Add your new table definition with all columns
-3. Define relations for the new table in the same file
-4. Add the table and its relations to the default export
-5. Never create separate schema files for new tables
+- Set proper connection pool sizes based on environment needs
 
-Example:
+// Connection configuration based on environment
+const connectionString = process.env.DATABASE_URL || "";
+const ssl = process.env.NODE_ENV === 'production' ? 'require' : false;
+const poolSize = process.env.NODE_ENV === 'production' ? 10 : 3;
 
-```typescript
-// In db/schema/prepare-schema.ts
-
-// Add new table definition
-export const notifications = pgTable("notifications", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  message: text("message").notNull(),
-  isRead: boolean("is_read").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+const client = postgres(connectionString, { 
+  ssl, 
+  max: poolSize 
 });
 
-// Define relations
-export const notificationsRelations = relations(notifications, ({ one }) => ({
-  user: one(users, {
-    fields: [notifications.userId],
-    references: [users.id],
-  }),
-}));
 
-// Then update the default export to include the new table and relations
-export default {
-  // ... existing tables and relations
-  notifications,
-  notificationsRelations,
-};
-```
+## Repository Pattern Implementation
 
-### Modifying an Existing Table
+- Create one repository file per domain entity
 
-1. Edit **ONLY** the table definition in `db/schema/prepare-schema.ts`
-2. If necessary, update relations in the same file
-3. Never create a separate file for schema changes
+- Follow consistent method naming: getEntityById, createEntity, etc.
 
-### Testing Schema Changes
+- Implement proper transaction handling for multi-table operations
 
-1. Always run `npx tsx test-prepared-db.ts` after schema changes to verify relations
-2. Fix any errors before deploying
-3. Test specific entity relations using repository functions
+- Use repository composition for complex queries across domains
 
-## Repository Pattern for Database Access
+// Example transaction pattern
+export async function createUserWithPreferences(data: UserData, preferences: PreferenceData) {
+  return db.transaction(async (tx) => {
+    const user = await tx.insert(users).values(data).returning();
+    await tx.insert(userPreferences).values({
+      userId: user[0].id,
+      ...preferences
+    });
+    return user[0];
+  });
+}
 
-Continue using the repository pattern for database access, but ensure repositories import tables from the consolidated schema:
+## Query Performance
 
-```typescript
-// CORRECT: Import from the prepared schema
-import { db } from "@/db/db";
-import { users, userPreferences } from "@/db/schema/prepare-schema";
-import { eq } from "drizzle-orm";
+- Add appropriate indexes for frequently queried columns
 
-// Repository functions...
-```
+- Use selective column fetching instead of SELECT *
 
-## Common Issues and Solutions
+- Implement pagination for large result sets
 
-### "Cannot read properties of undefined (reading 'referencedTable')"
+- Monitor query performance in production
 
-This error occurs when there are circular dependencies in table relations. The consolidated schema approach prevents this by:
-1. Defining all tables before any relations
-2. Keeping all definitions in a single file
-3. Exporting a complete schema object
+- Consider materialized views for complex, frequent queries
 
-### Type Mismatches in Foreign Keys
+## Type Safety
 
-Ensure that column types match exactly between primary and foreign keys. For example, if `users.id` is `text`, then `userPreferences.userId` must also be `text`, not `integer`.
+- Use Drizzle's InferSelectModel and InferInsertModel for type definitions
 
-## SQL Schema for Reference
+- Create consistent type exports in a central types file
 
-For reference, here's the complete SQL schema:
+- Define relation types that include joined data
 
-```sql
--- Users table
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,
-  clerk_id TEXT UNIQUE NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+// In types/db.ts
+export type User = InferSelectModel<typeof users>;
+export type NewUser = InferInsertModel<typeof users>;
 
--- User preferences
-CREATE TABLE user_preferences (
-  id SERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  theme TEXT DEFAULT 'light',
-  default_domain TEXT DEFAULT 'building-regulations',
-  context_window INTEGER DEFAULT 5,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+export interface UserWithRelations extends User {
+  preferences?: UserPreference;
+  credits?: UserCredit;
+}
 
--- ... other table definitions ...
-```
+## Schema Migrations
 
-## Database Access Patterns
+- Use Drizzle's migration tools for schema changes: drizzle-kit generate
 
-Continue using the repository pattern as before, but always ensure repositories import tables from the consolidated schema, not individual files.
+- Version migration files with timestamps
 
-Remember: **Always use the consolidated schema approach to avoid circular dependencies and "referencedTable" errors.**
+- Test migrations in development before applying to production
+
+- Keep migration history in version control
+
+- Implement rollback strategies for critical migrations
+
+## Schema Validation and Diagnostics
+Create diagnostic scripts to validate the database schema integrity:
+
+typescript
+
+Apply to database-sch...
+
+// Example diagnostic check
+console.log("Checking schema tables...");
+Object.entries(schema).forEach(([name, table]) => {
+  if (!table) {
+    console.error(`Schema table ${name} is undefined`);
+  } else {
+    console.log(`Schema table ${name} loaded correctly`);
+  }
+});
+
+## Testing Database Relations
+
+Use the provided test scripts to validate database functionality:
+
+bash
+
+Apply to database-sch...
+
+Run
+
+# Test database relations
+npx tsx test-prepared-db.ts
+
+# Test user synchronization
+npx tsx test-user-sync.ts
+
+##Best Practices
+
+1. Transactions: Use transactions for operations that modify multiple tables
+
+2. Repository Pattern: Follow the repository pattern for database access
+
+3. Schema Changes:
+
+- Run migration scripts for schema changes
+
+- Test thoroughly after any schema modifications
+
+- Update documentation when schema changes
+
+1. Error Handling: Implement proper error handling for database operations
+
+2. Input Validation: Use Zod for API input validation before database operations
+
+3. Database Client: Use a single db instance throughout the application
+
+4. Foreign Keys: Always define foreign key constraints in the schema
+
+5. Indexes: Add indexes for fields used in WHERE clauses and JOIN conditions
+
+6. Date Fields: Include createdAt and updatedAt fields for all major entities
+
+7. Soft Deletes: Consider implementing soft deletes for user-generated content
+
+## Synchronization Patterns
+
+When synchronizing data between external services (like Clerk) and our database:
+
+1. Use idempotent operations to prevent duplication
+
+2. Implement proper error handling with retries
+
+3. Log synchronization events for debugging
+
+4. Handle edge cases like partial failures
+
+// Example synchronization pattern
+export async function syncUserWithClerk(clerkUser) {
+  try {
+    // Check if user already exists
+    const existingUser = await getUserByClerkId(clerkUser.id);
+    
+    if (existingUser) {
+      // Update existing user
+      return await updateUser(existingUser.id, {
+        // Update properties
+      });
+    } else {
+      // Create new user with default preferences and credits
+      return await createUserWithDefaults(clerkUser);
+    }
+  } catch (error) {
+    console.error("Error syncing user with Clerk:", error);
+    // Implement proper error handling and retries
+  }
+}
