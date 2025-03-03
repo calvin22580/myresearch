@@ -1,12 +1,14 @@
+import React from 'react';
+
 /**
  * Knowledge domain definitions for the AI assistant
  */
 
 export interface KnowledgeDomain {
   id: string;
-  name: string;
+  label: string;
   description: string;
-  icon?: string; // Lucide icon name
+  icon?: React.ReactNode;
   color?: string; // Tailwind color class
 }
 
@@ -16,30 +18,30 @@ export interface KnowledgeDomain {
 export const KNOWLEDGE_DOMAINS: KnowledgeDomain[] = [
   {
     id: 'building_regulations',
-    name: 'Building Regulations',
+    label: 'Building Regulations',
     description: 'UK building regulations and compliance guidelines',
-    icon: 'Building',
+    icon: '🏢',
     color: 'text-blue-500',
   },
   {
     id: 'health_safety',
-    name: 'Health & Safety',
+    label: 'Health & Safety',
     description: 'Workplace health and safety regulations and best practices',
-    icon: 'ShieldCheck',
+    icon: '🛡️',
     color: 'text-green-500',
   },
   {
     id: 'immigration',
-    name: 'Immigration',
+    label: 'Immigration',
     description: 'UK immigration rules and visa requirements',
-    icon: 'Plane',
+    icon: '✈️',
     color: 'text-purple-500',
   },
   {
     id: 'gdpr',
-    name: 'GDPR',
+    label: 'GDPR',
     description: 'EU GDPR and UK data protection regulations',
-    icon: 'Lock',
+    icon: '🔒',
     color: 'text-yellow-500',
   },
 ];
@@ -47,7 +49,8 @@ export const KNOWLEDGE_DOMAINS: KnowledgeDomain[] = [
 /**
  * Get a knowledge domain by ID
  */
-export function getKnowledgeDomain(id: string): KnowledgeDomain | undefined {
+export function getKnowledgeDomain(id: string | null | undefined): KnowledgeDomain | undefined {
+  if (!id) return undefined;
   return KNOWLEDGE_DOMAINS.find(domain => domain.id === id);
 }
 
@@ -61,6 +64,6 @@ export function getDefaultDomain(): KnowledgeDomain {
 /**
  * Get all available knowledge domains
  */
-export function getAllDomains(): KnowledgeDomain[] {
+export function getKnowledgeDomains(): KnowledgeDomain[] {
   return KNOWLEDGE_DOMAINS;
 } 

@@ -1,178 +1,136 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-export interface Conversation {
-  id: string;
-  title: string | null;
-  preview: string | null;
-  createdAt: Date;
-  userId: string;
-  domainId: string | null;
-  lastMessageAt: Date;
-}
+import { 
+  createConversation as createConversationAction,
+  getConversations as getConversationsAction,
+  deleteConversation as deleteConversationAction,
+  updateConversationTitle as updateConversationTitleAction,
+} from "@/lib/actions/conversation";
+import type { Conversation } from "@/types/conversation";
 
 export function useConversations() {
+  const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const router = useRouter();
-
-  // Fetch conversations
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Fetch conversations on mount
   const fetchConversations = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      const response = await fetch('/api/conversations');
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch conversations');
-      }
-      
-      const data = await response.json();
+      const data = await getConversationsAction();
       setConversations(data);
     } catch (err) {
-      console.error('Error fetching conversations:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      toast.error('Failed to load conversations');
+      console.error("Failed to fetch conversations:", err);
+      setError("Failed to fetch conversations. Please try again later.");
+      toast.error("Failed to fetch conversations. Please try again later.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Ensure user exists in database
-  const ensureUserSynced = useCallback(async () => {
-    try {
-      const response = await fetch('/api/user/sync');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sync user');
-      }
-      return true;
-    } catch (err) {
-      console.error('Error syncing user:', err);
-      toast.error('User synchronization failed');
-      return false;
-    }
-  }, []);
-
-  // Create a new conversation
-  const createConversation = useCallback(async (
-    message: string, 
-    domainId?: string
-  ) => {
-    try {
-      // First ensure user is synced
-      const userSynced = await ensureUserSynced();
-      if (!userSynced) {
-        throw new Error('User synchronization failed. Please try again.');
-      }
-
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message, 
-          domainId 
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create conversation');
-      }
-      
-      const newConversation = await response.json();
-      
-      // Add to local state
-      setConversations((prev) => [newConversation, ...prev]);
-      
-      // Navigate to the new conversation
-      router.push(`/conversations/${newConversation.id}`);
-      
-      return newConversation;
-    } catch (err) {
-      console.error('Error creating conversation:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
-      throw err;
-    }
-  }, [router, ensureUserSynced]);
-
-  // Delete a conversation
-  const deleteConversation = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete conversation');
-      }
-      
-      // Remove from local state
-      setConversations((prev) => prev.filter((conversation) => conversation.id !== id));
-      
-      toast.success('Conversation deleted');
-      
-      // If on the deleted conversation page, navigate back to conversations
-      if (window.location.pathname.includes(`/conversations/${id}`)) {
-        router.push('/conversations');
-      }
-    } catch (err) {
-      console.error('Error deleting conversation:', err);
-      toast.error('Failed to delete conversation');
-    }
-  }, [router]);
-
-  // Get a single conversation by ID
-  const getConversation = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch conversation');
-      }
-      
-      return await response.json();
-    } catch (err) {
-      console.error('Error fetching conversation:', err);
-      toast.error('Failed to load conversation');
-      throw err;
-    }
-  }, []);
-
-  // Fetch conversations on mount
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
 
+  // Create a new conversation
+  const createConversation = useCallback(async (
+    message: string, 
+    knowledgeDomain?: string
+  ) => {
+    try {
+      setIsCreating(true);
+      setError(null);
+      
+      const conversation = await createConversationAction(message, knowledgeDomain);
+      
+      setConversations((prev) => [conversation, ...prev]);
+      router.push(`/conversations/${conversation.id}`);
+      
+      return conversation;
+    } catch (err) {
+      console.error("Failed to create conversation:", err);
+      setError("Failed to create conversation. Please try again later.");
+      toast.error("Failed to create conversation. Please try again later.");
+      return null;
+    } finally {
+      setIsCreating(false);
+    }
+  }, [router]);
+
+  // Delete a conversation
+  const deleteConversation = useCallback(async (id: string) => {
+    try {
+      setError(null);
+      await deleteConversationAction(id);
+      
+      // Update local state
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      
+      toast.success("Conversation deleted successfully");
+      
+      // If we're on the page of the deleted conversation, redirect to conversations list
+      if (window.location.pathname.includes(`/conversations/${id}`)) {
+        router.push("/conversations");
+      }
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+      setError("Failed to delete conversation. Please try again later.");
+      toast.error("Failed to delete conversation. Please try again later.");
+    }
+  }, [router]);
+
+  // Update conversation title
+  const updateConversationTitle = useCallback(async (id: string, title: string) => {
+    try {
+      setError(null);
+      await updateConversationTitleAction(id, title);
+      
+      // Update local state
+      setConversations((prev) => 
+        prev.map((c) => (c.id === id ? { ...c, title } : c))
+      );
+      
+      toast.success("Conversation title updated");
+    } catch (err) {
+      console.error("Failed to update conversation title:", err);
+      setError("Failed to update conversation title. Please try again later.");
+      toast.error("Failed to update conversation title. Please try again later.");
+    }
+  }, []);
+
   // Filter conversations based on search query
-  const filteredConversations = searchQuery
-    ? conversations.filter(
-        (conversation) =>
-          conversation.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          conversation.preview?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : conversations;
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return conversations;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    return conversations.filter(
+      (conversation) => 
+        conversation.title?.toLowerCase().includes(query) || 
+        conversation.preview?.toLowerCase().includes(query) ||
+        conversation.knowledgeDomain?.toLowerCase().includes(query)
+    );
+  }, [conversations, searchQuery]);
 
   return {
     conversations: filteredConversations,
     isLoading,
+    isCreating,
     error,
     searchQuery,
     setSearchQuery,
-    fetchConversations,
     createConversation,
     deleteConversation,
-    getConversation,
+    updateConversationTitle,
+    fetchConversations,
   };
 } 

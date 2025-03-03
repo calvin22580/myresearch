@@ -1,9 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Search, Trash2 } from 'lucide-react';
+import { SearchX, Loader2 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,138 +13,190 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useConversations } from '@/hooks/use-conversations';
 import { NewConversationButton } from './new-conversation-button';
-
-interface ConversationItemProps {
-  id: string;
-  title: string;
-  preview: string;
-  createdAt: Date;
-  isSelected?: boolean;
-  onClick?: () => void;
-  onDelete?: () => void;
-}
-
-const ConversationItem: React.FC<ConversationItemProps> = ({
-  id,
-  title,
-  preview,
-  createdAt,
-  isSelected,
-  onClick,
-  onDelete,
-}) => {
-  return (
-    <div
-      className={cn(
-        'flex flex-col p-4 rounded-md cursor-pointer transition-colors',
-        isSelected 
-          ? 'bg-primary/10 hover:bg-primary/15' 
-          : 'hover:bg-muted'
-      )}
-      onClick={onClick}
-    >
-      <div className="flex justify-between items-start gap-2">
-        <h3 className="font-medium text-sm truncate">{title}</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatDistanceToNow(createdAt, { addSuffix: true })}
-          </span>
-          {onDelete && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground mt-1 truncate">{preview}</p>
-    </div>
-  );
-};
-
-const ConversationSkeleton: React.FC = () => (
-  <div className="flex flex-col p-4 gap-2">
-    <div className="flex justify-between items-start">
-      <Skeleton className="h-5 w-3/4" />
-      <Skeleton className="h-4 w-16" />
-    </div>
-    <Skeleton className="h-4 w-full mt-1" />
-  </div>
-);
+import { ConversationItem } from './conversation-item';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ConversationListProps {
   className?: string;
 }
 
-const ConversationList: React.FC<ConversationListProps> = ({ className }) => {
+export function ConversationList({ className }: ConversationListProps) {
   const router = useRouter();
+  const parentRef = React.useRef<HTMLDivElement>(null);
+  
   const { 
     conversations, 
     isLoading, 
     searchQuery, 
-    setSearchQuery, 
-    deleteConversation 
+    setSearchQuery,
+    deleteConversation,
+    fetchConversations
   } = useConversations();
   
-  // Get URL path to check which conversation is currently selected
+  // Get current path to determine selected conversation
   const [currentPath, setCurrentPath] = React.useState('');
   
   React.useEffect(() => {
     setCurrentPath(window.location.pathname);
   }, []);
   
-  const handleDeleteConversation = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this conversation?')) {
-      await deleteConversation(id);
-    }
+  // For debouncing search input
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(searchQuery);
+  
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(localSearchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [localSearchQuery, setSearchQuery]);
+  
+  React.useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
+  
+  // Set up virtualization for the conversation list
+  const rowVirtualizer = useVirtualizer({
+    count: isLoading ? 5 : conversations.length || 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72, // Estimated height of each conversation item
+    overscan: 5,
+  });
+  
+  // Handle refresh button click
+  const handleRefresh = (e: React.MouseEvent) => {
+    e.preventDefault();
+    fetchConversations();
   };
-
+  
   return (
     <div className={cn('flex flex-col h-full', className)}>
       <div className="p-4 flex flex-col gap-4">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search conversations..."
-            className="pl-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-3"
+            value={localSearchQuery}
+            onChange={(e) => setLocalSearchQuery(e.target.value)}
           />
+          {localSearchQuery && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1 h-7 w-7 p-0"
+              onClick={() => setLocalSearchQuery('')}
+            >
+              <span className="sr-only">Clear search</span>
+              <SearchX className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         <NewConversationButton />
       </div>
       <Separator />
-      <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
-          Array(5).fill(0).map((_, i) => <ConversationSkeleton key={i} />)
-        ) : conversations.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground text-sm">
-            {searchQuery ? 'No conversations found' : 'No conversations yet'}
+      
+      {/* Loading, empty, or error states */}
+      {isLoading ? (
+        <div className="flex-1 p-4 space-y-3">
+          {Array(5).fill(0).map((_, i) => (
+            <div key={i} className="flex flex-col space-y-2 animate-pulse">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-[70%]" />
+                <Skeleton className="h-4 w-[20%]" />
+              </div>
+              <Skeleton className="h-3 w-[90%]" />
+              <Skeleton className="h-3 w-[40%]" />
+            </div>
+          ))}
+        </div>
+      ) : conversations.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+          <div className="rounded-full bg-muted p-3 mb-3">
+            <SearchX className="h-6 w-6 text-muted-foreground" />
           </div>
-        ) : (
-          conversations.map((conversation) => (
-            <ConversationItem
-              key={conversation.id}
-              id={conversation.id}
-              title={conversation.title || 'New Conversation'}
-              preview={conversation.preview || 'No messages yet'}
-              createdAt={conversation.createdAt}
-              isSelected={currentPath.includes(`/conversations/${conversation.id}`)}
-              onClick={() => router.push(`/conversations/${conversation.id}`)}
-              onDelete={() => handleDeleteConversation(conversation.id)}
-            />
-          ))
-        )}
+          <p className="text-muted-foreground font-medium mb-1">
+            {searchQuery ? 'No conversations found' : 'No conversations yet'}
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {searchQuery 
+              ? `Try a different search term or clear your search`
+              : `Start a new conversation to get help with your research`
+            }
+          </p>
+          {searchQuery ? (
+            <Button variant="outline" onClick={() => setSearchQuery('')}>
+              Clear search
+            </Button>
+          ) : (
+            <NewConversationButton />
+          )}
+        </div>
+      ) : (
+        <div ref={parentRef} className="flex-1 overflow-auto relative">
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const conversation = conversations[virtualRow.index];
+              
+              return (
+                <div
+                  key={virtualRow.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <ConversationItem
+                    conversation={conversation}
+                    isActive={currentPath.includes(`/conversations/${conversation.id}`)}
+                    onClick={() => router.push(`/conversations/${conversation.id}`)}
+                    onDelete={() => deleteConversation(conversation.id)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Empty search results */}
+          {conversations.length === 0 && searchQuery && (
+            <div className="p-4 text-center">
+              <p className="text-sm text-muted-foreground">No conversations matching "{searchQuery}"</p>
+              <Button variant="link" onClick={() => setSearchQuery('')}>
+                Clear search
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Refresh button at the bottom */}
+      <div className="p-2 flex justify-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground w-full"
+          onClick={handleRefresh}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+              Refreshing...
+            </>
+          ) : (
+            'Refresh conversations'
+          )}
+        </Button>
       </div>
     </div>
   );
-};
-
-export { ConversationList }; 
+} 
