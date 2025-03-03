@@ -1,0 +1,20 @@
+---
+description: Primary rule that introduces the overall project and its architecture
+globs: */
+alwaysApply: true
+---
+# My-Research.ai Project Overview
+
+My-Research.ai is a specialized Knowledge Assistant Chatbot for professionals with citation support and credit-based subscription model.
+
+The application uses:
+- Next.js 15 with App Router
+- TypeScript
+- Tailwind CSS with Shadcn UI
+- Clerk for authentication
+- Drizzle ORM with PostgreSQL (Supabase)
+- Pinecone Assistant API for knowledge retrieval
+- Vercel Blob Storage for PDF storage
+
+[implementation-plan.mdc](mdc:.cursor/rules/implementation-plan.mdc)
+[product-requirements.mdc](mdc:.cursor/rules/product-requirements.mdc)

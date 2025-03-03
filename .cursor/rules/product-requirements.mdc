@@ -1,0 +1,257 @@
+---
+description: Detailed product requirements and specifications
+globs: app//*,components//*
+alwaysApply: false
+---
+# Product Requirements Document
+
+This rule contains the detailed product requirements for My-Research.ai.
+
+## When to Apply
+Apply when working on feature implementation to ensure alignment with product goals.
+
+## File Patterns
+app/**/*
+components/**/*
+
+
+## 1. Introduction
+
+My-Research.ai is a specialized Knowledge Assistant Chatbot designed to provide professionals with accurate answers and citations for UK building regulations, UK health and safety regulations, UK immigration regulations, EU GDPR, and other regulatory frameworks. The application leverages AI retrieval technology for information extraction, featuring an intuitive interface with PDF citation viewing and a credit-based subscription model.
+
+## 2. Target Audience
+
+- **UK Construction companies, architects, and surveyors** who need to quickly access building regulations
+- **Legal firms** offering advice on health and safety
+- **Accountancy practices** searching UK tax law
+- **Companies in the EU** looking for GDPR information
+- **Immigration lawyers and firms**
+- **Other professionals** requiring regulatory information
+
+## 3. Product Goals
+
+1. Create a reliable, accurate AI assistant for regulatory research
+2. Provide verifiable citations with direct access to source documents
+3. Implement a sustainable business model through credits and subscriptions
+4. Deliver a polished, professional user experience
+5. Establish domain-specific landing pages to attract target users
+
+## 4. Feature Requirements
+
+### 4.1 Knowledge Assistant Chatbot
+
+- **AI Model Integration**: Connect with Pinecone Assistant API for knowledge retrieval
+- **Domain-specific Knowledge**: Filter responses to specific domains (building regs, health & safety, etc.)
+- **Conversation Management**: Support for multiple conversations, history tracking, and context management
+- **Citation Support**: Generate and display inline numbered citations for responses
+- **Context Window Control**: Allow users to adjust how much conversation history is included in queries
+- **Token Usage Tracking**: Monitor and manage token consumption for credit system
+
+### 4.2 PDF Document Viewing
+
+- **Document Viewer**: Integrated PDF viewer with pagination, zoom, and navigation controls
+- **Citation Highlighting**: Automatically highlight cited text in source documents
+- **Document Management**: Backend system to upload, store, and retrieve PDF documents
+- **Text Mapping**: Ability to map citation text to positions in PDFs
+- **Mobile-friendly Viewing**: Optimized PDF viewing for smaller screens
+
+### 4.3 Credit System
+
+- **Credit Allocation**:
+    - Free tier: 5 credits per day (refreshed at midnight)
+    - Paid tiers: Various credit allocations based on subscription level
+- **Credit Consumption**: Track and deduct credits for each user query (approximately 1 credit per query)
+- **Credit Balance Display**: Show users their remaining credits
+- **Credit Alerts**: Warn users when credits are low or depleted
+- **Credit Refresh**: Automatic refresh of free tier credits at midnight
+
+### 4.4 User Authentication and Management
+
+- **Authentication Methods**:
+    - Google login
+    - Microsoft login
+    - Email/password authentication
+- **User Profiles**: Store and manage user information and preferences
+- **User Preferences**: Store theme preference, default knowledge domain, context window settings
+- **Account Management**: Allow users to delete their accounts
+
+### 4.5 User Interface
+
+- **Three-panel Layout**:
+    - Sidebar for conversation navigation
+    - Chat interface for interactions
+    - PDF viewer for citations
+- **Adaptive Layout**: Start with centered chat and transition to multi-panel when PDFs are viewed
+- **Responsive Design**: Support for desktop, tablet, and mobile devices
+- **Theme Support**: Light and dark mode options
+- **Professional Design**: Clean, intuitive interface for professional users
+
+### 4.6 Landing Pages and SEO
+
+- **Domain-specific Landing Pages**: Create optimized pages for each knowledge domain
+- **SEO Implementation**: Meta tags, structured data, and canonical URLs
+- **Conversion Elements**: Clear calls to action and value propositions
+
+## 5. Technical Requirements
+
+### 5.1 Technology Stack
+
+- **Frontend**: Next.js App Router with React and TypeScript
+- **Styling**: Tailwind CSS with Shadcn UI components
+- **Database**: Drizzle ORM with PostgreSQL database
+- **Authentication**: Clerk for user authentication
+- **State Management**: Zustand for client-side state
+- **PDF Storage**: Vercel Blob Storage
+- **API Integration**: Pinecone Assistant API
+
+### 5.2 Database Schema
+
+- **Users**: Authentication info and profile details
+- **User Preferences**: Theme, default knowledge domain, context window settings
+- **Conversations**: User-owned conversation metadata
+- **Messages**: Individual messages in conversations with token usage tracking
+- **User Credits**: Credit balance tracking
+- **Credit Transactions**: History of credit additions and deductions
+- **Subscription Plans**: Available subscription plans and their details
+- **PDFs**: Document metadata including storage paths
+- **Citations**: Records linking messages to specific sections in PDFs
+
+### 5.3 API Requirements
+
+- **Assistant API**: Integration with Pinecone Assistant API
+- **PDF Processing**: API endpoints for PDF storage and retrieval
+- **Credit Management**: Endpoints for checking, deducting, and refreshing credits
+- **User Data**: APIs for user data synchronization and management
+- **Export Functionality**: Endpoint for exporting conversations
+
+## 6. User Flows
+
+### 6.1 New User Registration Flow
+
+1. User lands on marketing page
+2. User types in question to chat input box
+3. User clicks send
+4. Popup asks user to sign up
+5. User clicks "Sign Up" button
+6. User completes registration with email/password or OAuth
+7. User is redirected to main application
+8. Free tier credits (5) are automatically added to user account
+9. Original question user typed on first landing page is passed to the chat interface and the message is sent
+
+### 6.2 Asking a Question Flow
+
+1. User types a question in the chat input
+2. System checks for sufficient credits
+3. If credits available, system displays "thinking" indicator
+4. System processes query through Pinecone Assistant API with appropriate domain filtering
+5. Response is displayed with inline numbered citations
+6. Credits are deducted from user balance
+7. Token usage is recorded in the database
+
+### 6.3 Citation Viewing Flow
+
+1. User clicks on an inline citation number in a response (citation details from pinecone json response. Document name, page number, highlighted text)
+2. PDF viewer panel opens (if not already open)
+3. System loads the appropriate PDF document from the Vercel blob storage 
+4. System scrolls to the referenced page
+5. System highlights the cited text
+6. User can read the source material
+7. User can close the PDF view to return to centered chat layout
+
+### 6.4 Credit Depletion Flow
+
+1. User attempts to send a message
+2. System detects insufficient credits
+3. System displays credit limit dialog with pricing options
+4. User is presented with "Coming Soon" message for payment features
+5. User can wait for free credits to refresh at midnight
+
+## 7. UI/UX Requirements
+
+### 7.1 Layout Components
+
+- **Dashboard Layout**: Professional three-panel layout with responsive behavior
+- **Sidebar**: Collapsible navigation with conversation list
+- **Chat Interface**: Clean, professional message bubbles with clear user/assistant distinction
+- **PDF Viewer**: Professional document viewer with highlight overlays
+- **Responsive Behavior**: Layout adapts to different screen sizes
+
+### 7.2 Design Elements
+
+- **Color Scheme**: Professional palette with light/dark mode support
+- **Typography**: Clear, readable fonts for professional users
+- **Loading States**: Polished loading indicators and skeleton screens
+- **Error Handling**: User-friendly error messages and recovery options
+
+### 7.3 Key UI Components
+
+- **Chat Messages**: Both user and assistant messages with citation support
+- **Citation References**: Inline numbered citations with hover previews
+- **Thinking Indicator**: Professional animation for AI processing state
+- **PDF Controls**: Navigation, zoom, and search functionality
+- **Credit Display**: Clear indication of available credits
+- **Domain Selector**: Dropdown to filter responses to specific knowledge domains
+
+## 8. Non-functional Requirements
+
+### 8.1 Performance
+
+- **Response Time**: Optimize for fast initial page load
+- **API Efficiency**: Optimize API requests to minimize latency
+- **PDF Loading**: Efficient loading and caching of PDF documents
+- **Mobile Performance**: Efficient resource usage on mobile devices
+
+### 8.2 Security
+
+- **Authentication**: Secure user authentication with Clerk
+- **Database Security**: Proper access controls and data protection
+- **PDF Access**: Secure storage and retrieval of documents
+
+### 8.3 Reliability
+
+- **Error Handling**: Graceful handling of API failures and edge cases
+- **Data Persistence**: Reliable storage of user data and conversations
+- **Service Availability**: Minimize downtime and service disruptions
+
+## 9. Limitations and Constraints
+
+- **Initial Knowledge Domains**: Focus on UK Building Regulations and UK Health and Safety first
+- **Credit System**: Initial implementation without actual payment processing
+- **Mobile Experience**: Prioritize desktop experience with functional mobile support
+- **PDF Handling**: Limited to pre-loaded documents by administrators
+
+## 10. Implementation Phases
+
+### Phase 1: Core Functionality (Current Plan)
+
+- Implement database schema and authentication
+- Build UI components and layout system
+- Integrate Pinecone Assistant API
+- Implement conversation and chat functionality
+- Create PDF viewer with citation highlighting
+- Implement basic credit system with free tier
+
+### Phase 2: Payment Integration (Future)
+
+- Implement Stripe payment processing
+- Add subscription management
+- Enable credit purchases
+- Implement billing and invoicing
+
+### Phase 3: Advanced Features (Future)
+
+- Add admin dashboard
+- Implement user analytics
+- Add multi-language support
+- Enhance mobile experience
+- Add document upload for users
+
+## 11. Success Metrics
+
+- **User Engagement**: Average session duration and queries per user
+- **Retention**: Daily and monthly active users
+- **Conversion**: Free to paid conversion rate
+- **Response Quality**: Accuracy and relevance of AI responses
+- **Citation Effectiveness**: Frequency of citation viewing
+
+@file app-flow.md

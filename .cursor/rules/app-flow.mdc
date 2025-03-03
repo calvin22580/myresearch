@@ -1,0 +1,314 @@
+---
+description: User journeys and application flow documentation
+globs: app//*,components//*
+alwaysApply: false
+---
+# App Flow Document
+
+This rule details the user journeys and application flow for My-Research.ai.
+
+## When to Apply
+Apply when implementing user interface components and interactions.
+
+## File Patterns
+app/**/*
+components/**/*
+
+
+## 1. Application Structure Overview
+
+My-Research.ai
+├── Marketing & Landing Pages
+│   ├── Home
+│   ├── Building Regulations
+│   ├── Health & Safety
+│   ├── Immigration
+│   └── GDPR
+├── Authentication
+│   ├── Sign In
+│   ├── Sign Up
+│   └── Password Reset
+├── Main Application
+│   ├── Dashboard
+│   ├── Conversation Interface
+│   ├── PDF Viewer
+│   ├── Subscription/Credits
+│   └── User Profile
+└── Settings & Support
+    ├── Account Settings
+    ├── Preferences
+    └── Help Center
+
+## 2. Detailed User Journeys
+
+### 2.1 First-Time User Experience
+
+1. **Landing Page Entry**
+    - User arrives at domain-specific landing page from search or direct link
+    - System presents value proposition, feature highlights, and pricing information
+    - Landing page displays a functional chat input box prominently
+2. **Initial Engagement**
+    - User types a question into the chat input box
+    - User clicks send button
+    - System displays popup requiring signup to continue
+    - Popup preserves user's question in memory
+3. **Registration**
+    - User clicks "Sign Up" button in popup
+    - System presents authentication options (Google, Microsoft, Email)
+    - User selects authentication method and completes registration
+    - System creates user account in database
+    - System provisions 5 free credits to new user
+4. **Seamless Transition**
+    - System redirects user to main application
+    - System automatically transfers the user's original question to the chat interface
+    - System immediately sends the question to the assistant
+    - Processing begins with "thinking" indicator
+    - Initial credit is deducted and response is displayed with citations
+5. **Onboarding Elements**
+    - While waiting for the first response, system displays unobtrusive tooltips explaining:
+        - How to view citations
+        - Credit system basics
+        - How to start new conversations
+    - User can dismiss tooltips or explore the interface
+### 2.2 Returning User Experience
+
+1. **Authentication**
+    - User navigates to application
+    - System checks for existing session
+    - If session expired, user is prompted to log in
+    - System restores user state and redirects to last active conversation
+2. **Resume Activity**
+    - System loads conversation history
+    - User's credit balance is displayed
+    - If free tier credit refresh occurred, system shows notification
+
+### 2.3 Conversation Management
+
+1. **Starting New Conversation**
+    - User clicks "New Conversation" button in sidebar
+    - System creates new conversation record
+    - System clears chat interface and presents empty state
+    - User selects knowledge domain (optional)
+    - User enters question and conversation begins
+2. **Switching Conversations**
+    - User clicks conversation in sidebar list
+    - System saves current conversation state
+    - System loads selected conversation history
+    - System updates URL to reflect current conversation ID
+3. **Conversation Settings**
+    - User accesses conversation settings (via button or menu)
+    - System presents options:
+        - Rename conversation
+        - Change knowledge domain
+        - Adjust context window size
+        - Delete conversation
+    - User makes changes and system applies immediately
+
+### 2.4 Asking Questions Flow
+
+1. **Question Input**
+    - User types question in message input
+    - User submits question via Enter key or send button
+2. **Pre-submission Check**
+    - System checks user credit balance
+    - If insufficient credits:
+        - System blocks submission
+        - System displays credit limit dialog with pricing options
+        - User must close dialog to continue
+    - If credits available, process continues
+3. **Query Processing**
+    - User's message appears in chat
+    - System shows "thinking" animation
+    - System sends query to Pinecone Assistant API with:
+        - Selected knowledge domain filter
+        - User's question
+        - Previous context (based on context depth setting)
+4. **Response Display**
+    - System receives API response
+    - System processes citation information
+    - System formats and displays assistant response with inline numbered citations
+    - System deducts credit from user balance
+    - System records token usage in database
+
+### 2.5 Citation Viewing Flow
+
+1. **Citation Interaction**
+    - User hovers over citation number
+    - System displays tooltip preview of citation text
+    - User clicks citation number
+2. **PDF Viewer Activation**
+    - If PDF viewer not active:
+        - System transitions from centered chat to multi-panel layout
+        - Chat panel moves to right side
+        - PDF viewer panel appears on left
+    - If PDF viewer already active:
+        - Current PDF is replaced with new document if different
+3. **Document Navigation**
+    - System loads PDF document
+    - System scrolls to relevant page
+    - System highlights cited text
+    - User can navigate document using controls:
+        - Zoom in/out
+        - Page forward/back
+        - Jump to page
+        - Close PDF viewer (returns to centered chat)
+4. **Mobile Citation Viewing**
+    - On mobile devices:
+        - Citation click opens modal dialog
+        - Dialog contains PDF viewer optimized for small screens
+        - User can dismiss dialog to return to chat
+
+### 2.6 Credit Management Flow
+
+1. **Viewing Credits**
+    - User credit balance displayed persistently in header/sidebar
+    - User can click balance to view detailed usage history
+2. **Credit Refresh**
+    - At midnight UTC:
+        - System checks for free tier users
+        - System resets free tier users to 5 credits
+        - On next login/page load, system notifies user of refresh
+3. **Credit Limit Handling**
+    - When credits depleted:
+        - System prevents new queries
+        - System displays pricing dialog with subscription options
+        - Dialog shows "Coming Soon" badge for payment features
+        - User can close dialog to continue browsing existing conversations
+
+### 2.7 User Profile and Settings
+
+1. **Profile Access**
+    - User clicks profile button in header
+    - System displays dropdown with options:
+        - View Profile
+        - Preferences
+        - Help
+        - Sign Out
+2. **Preferences Management**
+    - User navigates to preferences page
+    - System displays settings for:
+        - Theme selection (light/dark)
+        - Default knowledge domain
+        - Context window size
+        - Notification preferences
+    - User makes changes and system saves immediately
+3. **Account Management**
+    - User navigates to profile page
+    - System displays account information:
+        - Personal details
+        - Credit balance and history
+        - Account deletion option
+
+## 3. Screen Transitions and Navigation
+
+### 3.1 Global Navigation
+
+- **Header Bar** (persistent across application):
+    - Logo/Home link (left)
+    - Domain selector dropdown (center-left)
+    - Credit balance display (center-right)
+    - Profile menu (right)
+    - Theme toggle (right)
+- **Sidebar** (collapsible, desktop only):
+    - New conversation button (top)
+    - Conversation list (scrollable)
+    - Sidebar collapse toggle (bottom)
+- **Mobile Navigation**:
+    - Hamburger menu (top-left) opens drawer with:
+        - Conversation list
+        - Domain selector
+        - Profile options
+        - Settings link
+
+### 3.2 Layout Transitions
+
+- **Default State** (no active citation):
+    - Chat interface centered
+    - Sidebar collapsed or expanded (user preference)
+- **Citation Active State**:
+    - Chat interface shifts to right panel
+    - PDF viewer appears as left panel
+    - Panels are resizable via drag handle
+- **Mobile Default State**:
+    - Full-screen chat interface
+    - Drawer navigation accessible via hamburger menu
+- **Mobile Citation State**:
+    - Modal dialog overlays chat interface
+    - Dialog contains PDF viewer with close button
+    - Returning to chat closes the PDF viewer
+
+## 4. Error Handling Flows
+
+### 4.1 API Failures
+
+1. **Assistant API Failure**
+    - System detects failed API call
+    - System displays error message in chat
+    - System does not deduct credit
+    - System offers retry option
+2. **PDF Loading Failure**
+    - System detects PDF loading issue
+    - System displays error in PDF viewer area
+    - System offers reload option
+    - Citation remains clickable for retry
+
+### 4.2 Network Issues
+
+1. **Connection Loss**
+    - System detects offline status
+    - System displays notification
+    - System prevents new message submission
+    - When connection restored, system automatically reconnects
+
+### 4.3 Authentication Errors
+
+1. **Session Expiration**
+    - System detects expired session
+    - System preserves current state
+    - System prompts for re-authentication
+    - Upon successful login, system restores previous state
+
+## 5. Responsive Behavior
+
+### 5.1 Desktop (>1024px)
+
+- Full three-panel layout capability
+- Collapsible sidebar
+- Resizable panels
+- Full PDF viewer functionality
+
+### 5.2 Tablet (768px-1024px)
+
+- Adapted three-panel layout with narrower sidebar
+- Collapsible panels to focus on chat or PDF
+- Slightly simplified PDF controls
+
+### 5.3 Mobile (<768px)
+
+- Single-panel focused design
+- Navigation via drawer menu
+- PDF viewing in modal overlay
+- Simplified citation display
+- Chat-centered experience
+
+## 6. Edge Cases and Special States
+
+### 6.1 First-time Empty States
+
+- Empty conversation list shows helpful tips
+- Empty chat shows suggested prompts
+- Empty PDF viewer shows usage instructions
+
+### 6.2 Loading States
+
+- Skeleton loaders for conversation list
+- "Thinking" animation for AI processing
+- Progressive PDF loading with placeholders
+
+### 6.3 Error States
+
+- Friendly error messages with recovery options
+- Offline mode with limited functionality
+- Credit depletion handling with clear upgrade path
+
+@file tech-stack.md

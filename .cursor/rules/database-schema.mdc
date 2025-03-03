@@ -1,0 +1,640 @@
+---
+description: Database schema and Neon MCP server
+globs: db//*,lib/repositories//,lib/db/**/
+alwaysApply: false
+---
+  
+
+**You have access to the Supabase MCP server
+
+  
+
+  Here are the tools you have available
+
+
+  
+
+  
+
+1. Database Schema Rule
+
+  
+
+  
+
+# Database Schema Implementation Rule
+
+  
+
+
+This rule provides guidance for implementing the database schema for My-Research.ai using Drizzle ORM with PostgreSQL.
+
+  
+
+  
+
+## When to Apply
+
+  
+
+Apply when working on database schema definition, migrations, or database access patterns.
+
+  
+
+  
+
+## File Patterns
+
+  
+
+db/**/*
+
+  
+
+lib/repositories/**/*
+
+  
+
+lib/db/**/*
+
+  
+
+  
+
+## Database Schema Overview
+
+  
+
+  
+
+My-Research.ai uses Drizzle ORM with a PostgreSQL database (Supabase). The schema consists of these core tables:
+
+  
+
+  
+
+### Core Tables
+
+  
+
+- `users`: User data synchronized with Clerk authentication
+
+  
+
+- `user_preferences`: User settings including theme, default domain, context window size
+
+  
+
+- `conversations`: Chat conversations owned by users
+
+  
+
+- `messages`: Individual messages within conversations, with token usage tracking
+
+  
+
+- `user_credits`: Credit balance tracking for users
+
+  
+
+- `credit_transactions`: History of credit additions and deductions
+
+  
+
+- `subscription_plans`: Available subscription plan definitions
+
+  
+
+- `pdfs`: Metadata for PDF documents stored in Vercel Blob Storage
+
+  
+
+- `citations`: Links between messages and specific sections in PDFs
+
+  
+
+  
+
+### Database Schema Implementation
+
+  
+
+  
+
+```sql
+
+  
+
+-- Users table
+
+  
+
+CREATE TABLE users (
+
+  
+
+  id TEXT PRIMARY KEY,
+
+  
+
+  clerk_id TEXT UNIQUE NOT NULL,
+
+  
+
+  email TEXT UNIQUE NOT NULL,
+
+  
+
+  display_name TEXT,
+
+  
+
+  avatar_url TEXT,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- User preferences
+
+  
+
+CREATE TABLE user_preferences (
+
+  
+
+  id SERIAL PRIMARY KEY,
+
+  
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  
+
+  theme TEXT DEFAULT 'light',
+
+  
+
+  default_domain TEXT DEFAULT 'building-regulations',
+
+  
+
+  context_window INTEGER DEFAULT 5,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- Conversations
+
+  
+
+CREATE TABLE conversations (
+
+  
+
+  id TEXT PRIMARY KEY,
+
+  
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  
+
+  title TEXT,
+
+  
+
+  domain TEXT,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- Messages
+
+  
+
+CREATE TABLE messages (
+
+  
+
+  id TEXT PRIMARY KEY,
+
+  
+
+  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+
+  
+
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+
+  
+
+  content TEXT NOT NULL,
+
+  
+
+  tokens_used INTEGER,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- Citations
+
+  
+
+CREATE TABLE citations (
+
+  
+
+  id TEXT PRIMARY KEY,
+
+  
+
+  message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+
+  
+
+  pdf_id TEXT NOT NULL REFERENCES pdfs(id),
+
+  
+
+  page_number INTEGER,
+
+  
+
+  highlight_text TEXT,
+
+  
+
+  position INTEGER,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- PDFs
+
+  
+
+CREATE TABLE pdfs (
+
+  
+
+  id TEXT PRIMARY KEY,
+
+  
+
+  name TEXT NOT NULL,
+
+  
+
+  blob_url TEXT NOT NULL,
+
+  
+
+  description TEXT,
+
+  
+
+  domain TEXT,
+
+  
+
+  size INTEGER,
+
+  
+
+  pages INTEGER,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- User credits
+
+  
+
+CREATE TABLE user_credits (
+
+  
+
+  id SERIAL PRIMARY KEY,
+
+  
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  
+
+  balance INTEGER NOT NULL DEFAULT 0,
+
+  
+
+  last_refresh TIMESTAMP,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- Credit transactions
+
+  
+
+CREATE TABLE credit_transactions (
+
+  
+
+  id SERIAL PRIMARY KEY,
+
+  
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  
+
+  amount INTEGER NOT NULL,
+
+  
+
+  message_id TEXT REFERENCES messages(id),
+
+  
+
+  description TEXT,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+-- Subscription plans
+
+  
+
+CREATE TABLE subscription_plans (
+
+  
+
+  id TEXT PRIMARY KEY,
+
+  
+
+  name TEXT NOT NULL,
+
+  
+
+  description TEXT,
+
+  
+
+  price DECIMAL(10, 2),
+
+  
+
+  credits_per_month INTEGER NOT NULL,
+
+  
+
+  active BOOLEAN DEFAULT true,
+
+  
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+  
+
+);
+
+  
+
+  
+
+Database Access Patterns
+
+  
+
+Use the repository pattern for database access:
+
+  
+
+  
+
+// Example repository pattern for conversations
+
+  
+
+// lib/repositories/conversation-repository.ts
+
+  
+
+import { db } from "@/db/db";
+
+  
+
+import { conversations, messages } from "@/db/schema";
+
+  
+
+import { eq } from "drizzle-orm";
+
+  
+
+  
+
+export async function getConversationById(id: string) {
+
+  
+
+  return db.query.conversations.findFirst({
+
+  
+
+    where: eq(conversations.id, id),
+
+  
+
+    with: {
+
+  
+
+      messages: true,
+
+  
+
+    },
+
+  
+
+  });
+
+  
+
+}
+
+  
+
+  
+
+export async function createConversation(userId: string, title: string) {
+
+  
+
+  const [conversation] = await db.insert(conversations)
+
+  
+
+    .values({
+
+  
+
+      id: crypto.randomUUID(),
+
+  
+
+      userId,
+
+  
+
+      title,
+
+  
+
+    })
+
+  
+
+    .returning();
+
+  
+
+  return conversation;
+
+  
+
+}
+
+  
+
+  
+
+Implementation Guidelines
+
+  
+
+  
+
+Use Drizzle ORM for type-safe database interactions
+
+  
+
+Create specific query functions for each use case
+
+  
+
+Handle transactions explicitly where needed
+
+  
+
+Use prepared statements for all queries
+
+  
+
+Implement proper error handling for database operations
+
+  
+
+Define clear relations between tables
+
+  
+
+Create indexes for columns used in WHERE clauses
+
+  
+
+Group related tables in their own schema files
+
+  
+
+Export a combined schema from the index.ts file**

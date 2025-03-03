@@ -1,0 +1,990 @@
+---
+description: 24-step implementation plan for building the application
+globs: .tsx,.ts
+alwaysApply: false
+---
+# Implementation Plan
+
+  
+
+This rule contains the 24-step implementation plan for My-Research.ai.
+
+  
+
+## When to Apply
+
+Apply when planning new feature implementation or understanding the project roadmap.
+
+  
+
+## File Patterns
+
+*.tsx
+
+*.ts
+
+  
+
+## Database Schema Implementation
+
+  
+  
+
+- [ ] Step 1: Create database schema (Supabase MCP Available)
+
+  - **Task**: Define and implement the database schema using Drizzle ORM with proper relations between entities
+
+  - **Files**:
+
+    - `db/schema/users.ts`: User table schema with authentication info and profile details
+
+    - `db/schema/user_preferences.ts`: User preferences including theme, default knowledge domain, and context window settings
+
+    - `db/schema/conversations.ts`: Conversations table with user relations and metadata
+
+    - `db/schema/messages.ts`: Messages table linked to conversations with token usage tracking
+
+    - `db/schema/user_credits.ts`: Credit balance and usage tracking
+
+    - `db/schema/credit_transactions.ts`: History of credit additions and deductions
+
+    - `db/schema/subscription_plans.ts`: Available subscription plans and their details
+
+    - `db/schema/pdfs.ts`: PDF document metadata including storage paths and document info
+
+    - `db/schema/citations.ts`: Citation records linking messages to specific sections in PDFs
+
+    - `db/schema/index.ts`: Export all schemas with relation definitions
+
+    - `types/db.ts`: TypeScript types for database schema and relations
+
+  - **Step Dependencies**: None (builds on existing setup)
+
+  - **User Instructions**: After code generation, run `npm run db:generate` and then `npm run db:push` to update the database schema
+
+- [ ] Step 2: Set up Clerk authentication core
+
+  - **Task**: Install and configure Clerk for authentication with Next.js
+
+  - **Files**:
+
+    - `package.json`: Add Clerk dependencies (@clerk/nextjs)
+
+    - `middleware.ts`: Implement Clerk middleware for route protection
+
+    - `app/layout.tsx`: Add ClerkProvider to the root layout
+
+    - `.env.local.example`: Add Clerk environment variables
+
+    - `lib/auth/clerk-config.ts`: Clerk configuration and theme settings
+
+    - `app/api/webhooks/clerk/route.ts`: Set up webhook endpoint for Clerk events
+
+    - `app/api/auth/[...clerk]/route.ts`: Handle Clerk authentication API routes
+
+    - `lib/auth/types.ts`: TypeScript interfaces for auth data
+
+  - **Step Dependencies**: Step 1
+
+  - **User Instructions**:
+
+    - Create a Clerk application at https://dashboard.clerk.dev
+
+    - Configure Google and Microsoft OAuth providers in Clerk dashboard
+
+    - Set up Clerk webhook endpoint in Clerk dashboard
+
+    - Add Clerk API keys to `.env.local`
+
+  
+
+- [ ] Step 3: Implement Clerk authentication UI and customization
+
+  - **Task**: Set up authentication pages and customize Clerk components
+
+  - **Files**:
+
+    - `app/sign-in/[[...sign-in]]/page.tsx`: Custom sign-in page with Clerk components
+
+    - `app/sign-up/[[...sign-up]]/page.tsx`: Custom sign-up page with Clerk components
+
+    - `components/auth/auth-wrapper.tsx`: Auth state wrapper component
+
+    - `components/auth/user-button.tsx`: Profile button with Clerk UserButton
+
+    - `components/auth/sign-in-button.tsx`: Custom sign-in button component
+
+    - `components/auth/auth-shell.tsx`: Layout shell for auth pages
+
+    - `components/auth/organization-switcher.tsx`: Organization switching component (if needed)
+
+    - `hooks/use-auth.ts`: Custom hook for common auth operations
+
+    - `styles/clerk-theme.css`: Custom styles for Clerk components
+
+    - `app/(auth)/layout.tsx`: Layout for auth-related pages
+
+    - `app/(protected)/layout.tsx`: Layout for protected pages with auth checks
+
+  - **Step Dependencies**: Step 2
+
+  - **User Instructions**:
+
+    - Configure appearance settings in Clerk dashboard or through the code
+
+    - Review and customize email templates in Clerk dashboard
+
+  
+
+- [ ] Step 4: Implement user data synchronization and management
+
+  - **Task**: Create system to sync Clerk user data with database and implement user management
+
+  - **Files**:
+
+    - `lib/db/user-sync.ts`: Functions to sync Clerk users with database
+
+    - `lib/actions/user.ts`: Server actions for user data management
+
+    - `lib/actions/user-preferences.ts`: Server actions for managing user preferences
+
+    - `hooks/use-user-data.ts`: Hook for accessing user data in components
+
+    - `components/user/user-profile.tsx`: User profile display and edit component
+
+    - `app/api/users/route.ts`: API endpoint for user operations
+
+    - `app/api/webhooks/clerk/user-sync/route.ts`: Specialized webhook handler for user events
+
+    - `components/providers/user-provider.tsx`: Context provider for user data
+
+    - `lib/auth/clerk-helpers.ts`: Helper functions for working with Clerk
+
+    - `types/user.ts`: Extended user type definitions
+
+  - **Step Dependencies**: Steps 2, 3
+
+  - **User Instructions**:
+
+    - Set up webhook signing secret in Clerk dashboard
+
+    - Configure necessary webhook events (user.created, user.updated, etc.)
+
+  
+
+## Core UI Components
+
+  
+
+- [ ] Step 5: Set up essential Shadcn UI components
+
+  - **Task**: Add and configure required Shadcn UI components with proper theming and accessibility
+
+  - **Files**:
+
+    - `package.json`: Add dependencies (react-hook-form, zod, @hookform/resolvers)
+
+    - `components/ui/button.tsx`: Button component with variants
+
+    - `components/ui/input.tsx`: Input component
+
+    - `components/ui/form.tsx`: Form component with validation integration
+
+    - `components/ui/card.tsx`: Card component
+
+    - `components/ui/toast.tsx`: Toast notification component
+
+    - `components/ui/toaster.tsx`: Toast container component
+
+    - `components/ui/dropdown-menu.tsx`: Dropdown menu component
+
+    - `components/ui/sheet.tsx`: Sheet component for mobile sidebar
+
+    - `components/ui/tabs.tsx`: Tabs component
+
+    - `components/ui/textarea.tsx`: Textarea component
+
+    - `components/ui/switch.tsx`: Switch/toggle component
+
+    - `components/ui/avatar.tsx`: Avatar component for user profiles
+
+    - `components/ui/dialog.tsx`: Dialog/modal component
+
+    - `components/ui/alert.tsx`: Alert component for important messages
+
+    - `components/ui/table.tsx`: Table component for data display
+
+    - `components/ui/slider.tsx`: Slider for context window control
+
+    - `components/ui/tooltip.tsx`: Tooltip component for help text
+
+    - `components/ui/skeleton.tsx`: Skeleton loading component
+
+    - `components/ui/badge.tsx`: Badge component for labels
+
+    - `components/ui/command.tsx`: Command component for keyboard shortcuts
+
+    - `components/providers/toast-provider.tsx`: Global toast provider
+
+    - `lib/form-schema.ts`: Zod schemas for form validation
+
+  - **Step Dependencies**: None (can be done in parallel with other steps)
+
+  
+
+- [ ] Step 6: Create dynamic layout and theme components
+
+  - **Task**: Build a flexible layout system using shadcn/ui components for responsive panels and theme switching
+
+  - **Files**:
+
+    - `components/ui/resizable.tsx`: Add shadcn ResizablePanelGroup components
+
+    - `components/ui/collapsible.tsx`: Add shadcn Collapsible component
+
+    - `components/ui/sheet.tsx`: Add shadcn Sheet component for mobile sidebar
+
+    - `components/ui/drawer.tsx`: Add shadcn Drawer component for mobile views
+
+    - `components/ui/toggle-group.tsx`: Add shadcn ToggleGroup for view options
+
+    - `components/ui/separator.tsx`: Add shadcn Separator for panel divisions
+
+    - `components/theme/theme-provider.tsx`: Add shadcn ThemeProvider
+
+    - `components/theme/theme-toggle.tsx`: Add shadcn theme toggle component
+
+    - `components/layout/dashboard-layout.tsx`: Main application layout using ResizablePanelGroup
+
+    - `components/layout/adaptive-layout.tsx`: Dynamic layout manager using shadcn components
+
+    - `components/layout/sidebar.tsx`: Collapsible sidebar using Sheet/Collapsible
+
+    - `components/layout/chat-container.tsx`: Chat container with adaptive sizing
+
+    - `components/layout/pdf-container.tsx`: PDF viewer container integrated with ResizablePanel
+
+    - `components/layout/header.tsx`: Application header with theme toggle
+
+    - `components/layout/mobile-navigation.tsx`: Mobile-specific navigation using Drawer
+
+    - `hooks/use-layout.ts`: Layout configuration with states for panel visibility
+
+    - `hooks/use-local-storage.ts`: Persistent storage for layout preferences
+
+    - `lib/layout-utils.ts`: Helper functions for layout calculations
+
+    - `app/globals.css`: Theme variables following shadcn pattern
+
+    - `app/(dashboard)/layout.tsx`: Dashboard wrapper with providers
+
+    - `styles/layout.css`: Additional animations for layout transitions
+
+  - **Step Dependencies**: Step 5
+
+  - **User Instructions**:
+
+    - Run `npx shadcn-ui@latest add resizable collapsible sheet drawer toggle-group separator` to install required components
+
+  
+
+## Knowledge Assistant Implementation
+
+  
+
+- [ ] Step 7: Set up Pinecone Assistant API integration
+
+  - **Task**: Implement the integration with Pinecone Assistant API with optimized performance for Vercel Edge Functions
+
+  - **Files**:
+
+    - `package.json`: Add Pinecone Assistant API client
+
+    - `lib/pinecone/client.ts`: Pinecone client configuration with API key handling
+
+    - `lib/pinecone/types.ts`: TypeScript definitions for API requests and responses
+
+    - `lib/pinecone/conversation.ts`: Functions for formatting conversation history
+
+    - `lib/pinecone/knowledge-domains.ts`: Constants and helpers for domain filtering
+
+    - `lib/pinecone/citation-parser.ts`: Utility to parse and format citation responses
+
+    - `lib/pinecone/token-counter.ts`: Utilities for tracking token usage
+
+    - `app/api/assistant/route.ts`: Edge API route for optimized assistant interactions
+
+    - `hooks/use-assistant.ts`: React hook for assistant interactions with state management
+
+    - `hooks/use-context-depth.ts`: Hook for managing conversation context depth slider
+
+    - `components/assistant/context-depth-slider.tsx`: UI component for adjusting context depth
+
+    - `components/assistant/domain-selector.tsx`: Knowledge domain selection component
+
+    - `types/assistant.ts`: Comprehensive type definitions for the assistant ecosystem
+
+  - **Step Dependencies**: Step 1, 2
+
+  
+
+- [ ] Step 8: Implement conversation management
+
+  - **Task**: Create the conversation management functionality
+
+  - **Files**:
+
+    - `components/chat/conversation-list.tsx`: List of user conversations
+
+    - `components/chat/conversation-item.tsx`: Individual conversation component
+
+    - `components/chat/new-conversation-button.tsx`: Create new conversation button
+
+    - `lib/actions/conversation.ts`: Server actions for conversation management
+
+    - `hooks/use-conversations.ts`: Custom hook for conversation data
+
+    - `app/(dashboard)/conversations/page.tsx`: Conversations page
+
+    - `app/(dashboard)/conversations/[id]/page.tsx`: Individual conversation page
+
+  - **Step Dependencies**: Step 6, 7
+
+  - **User Instructions**: None
+
+  
+
+- [ ]- [ ] Step 9: Create chat interface components
+
+  - **Task**: Build a professional chat interface with citation integration and credit management
+
+  - **Files**:
+
+    - `components/chat/chat-container.tsx`: Main container for the entire chat experience
+
+    - `components/chat/message-list.tsx`: Virtualized list for efficient rendering of messages
+
+    - `components/chat/user-message.tsx`: User message bubble component
+
+    - `components/chat/assistant-message.tsx`: Assistant message with citations support
+
+    - `components/chat/citation-reference.tsx`: Inline numbered citation component
+
+    - `components/chat/message-input.tsx`: Text input with submission handling
+
+    - `components/chat/thinking-indicator.tsx`: Professional "thinking" animation
+
+    - `components/chat/domain-selector.tsx`: Knowledge domain selection dropdown
+
+    - `components/chat/context-depth-control.tsx`: Slider for context window adjustment
+
+    - `components/chat/credit-limit-dialog.tsx`: Modal with pricing table when credits are exhausted
+
+    - `components/chat/pricing-table-simplified.tsx`: Simplified pricing table for the credit limit dialog
+
+    - `components/chat/error-message.tsx`: Elegant error display component
+
+    - `components/chat/empty-chat.tsx`: Empty state with starter prompts
+
+    - `components/chat/scroll-button.tsx`: Button to scroll to latest messages
+
+    - `hooks/use-chat.ts`: Main chat functionality and state management
+
+    - `hooks/use-chat-scroll.tsx`: Hook for handling scroll behavior
+
+    - `hooks/use-thinking-state.tsx`: Hook for managing thinking state animation
+
+    - `hooks/use-domain-selector.tsx`: Hook for domain switching logic
+
+    - `hooks/use-credit-check.tsx`: Hook for checking credit availability before sending messages
+
+    - `lib/chat/message-formatter.ts`: Utility for formatting messages with citations
+
+    - `lib/chat/credit-checker.ts`: Utility to check credit availability before sending
+
+    - `lib/chat/credit-limit-handler.ts`: Logic for handling credit limit reached scenarios
+
+    - `styles/chat-animations.css`: CSS animations for thinking indicator
+
+    - `app/api/chat/route.ts`: Optimized API endpoint for chat interactions
+
+  - **Step Dependencies**: Step 8
+
+  - **User Instructions**: None
+
+  
+
+## PDF Viewer and Citations
+
+  
+
+- [ ] Step 10: Set up Vercel Blob Storage and PDF management
+
+  - **Task**: Configure Vercel Blob Storage for PDF storage with citation highlighting capabilities
+
+  - **Files**:
+
+    - `package.json`: Add @vercel/blob and PDF processing dependencies
+
+    - `lib/blob/client.ts`: Vercel Blob client configuration
+
+    - `lib/blob/pdf-storage.ts`: PDF upload and retrieval functions
+
+    - `lib/blob/pdf-metadata.ts`: Metadata handling utilities
+
+    - `lib/blob/pdf-text-mapper.ts`: Utility to map text positions for highlighting
+
+    - `app/api/pdfs/upload/route.ts`: Admin-only PDF upload endpoint
+
+    - `app/api/pdfs/list/route.ts`: List available PDFs with metadata
+
+    - `app/api/pdfs/[id]/route.ts`: PDF retrieval endpoint
+
+    - `app/api/pdfs/[id]/text/route.ts`: Text content extraction endpoint for searching
+
+    - `types/pdf.ts`: TypeScript types for PDF data and metadata
+
+    - `scripts/upload-pdf.ts`: Command-line script for bulk PDF uploads
+
+    - `components/admin/pdf-upload-form.tsx`: Simple admin interface for PDF uploads
+
+  - **Step Dependencies**: Step 2
+
+  
+  
+
+- [ ] Step 11: Implement PDF viewer with citation highlighting
+
+  - **Task**: Create a professional PDF viewer with precise citation highlighting and optimized performance
+
+  - **Files**:
+
+    - `package.json`: Add react-pdf and PDF processing dependencies
+
+    - `components/pdf/pdf-viewer-container.tsx`: Main container with resizing capabilities
+
+    - `components/pdf/pdf-renderer.tsx`: Core PDF rendering component with optimizations
+
+    - `components/pdf/highlight-layer.tsx`: Overlay for text highlighting with positioning system
+
+    - `components/pdf/viewer-toolbar.tsx`: Controls for zoom, navigation, and view options
+
+    - `components/pdf/page-navigation.tsx`: Page selector and navigation controls
+
+    - `components/pdf/citation-jumper.tsx`: Component to handle citation click and PDF navigation
+
+    - `components/pdf/loading-placeholder.tsx`: Placeholder during PDF loading
+
+    - `components/pdf/error-fallback.tsx`: Error handling component for PDF loading issues
+
+    - `hooks/use-pdf-viewer.ts`: Core PDF viewer functionality and state management
+
+    - `hooks/use-pdf-highlight.ts`: Hook for managing highlight positions and navigation
+
+    - `hooks/use-pdf-cache.ts`: Hook for caching viewed PDFs to improve performance
+
+    - `lib/pdf/text-position-finder.ts`: Utility to map citation text to PDF positions
+
+    - `lib/pdf/pdf-optimizer.ts`: Utilities for optimizing PDF loading and rendering
+
+    - `lib/pdf/highlight-renderer.ts`: Logic for rendering highlights at correct positions
+
+    - `styles/pdf-viewer.css`: Custom styles for the PDF viewer and highlights
+
+    - `app/api/pdf/highlight/route.ts`: API endpoint for text position lookup
+
+  - **Step Dependencies**: Step 10
+
+  - **User Instructions**: None
+
+  
+
+- [ ] Step 12: Create citation components and integration
+
+  - **Task**: Implement inline citation system with hover previews and PDF integration
+
+  - **Files**:
+
+    - `components/citations/inline-citation.tsx`: Inline citation number component
+
+    - `components/citations/citation-preview.tsx`: Hover tooltip with citation preview
+
+    - `components/citations/citation-connector.tsx`: Component connecting citations to PDF viewer
+
+    - `components/citations/mobile-citation-dialog.tsx`: Mobile-specific citation popup
+
+    - `hooks/use-citation-preview.ts`: Hook for managing hover preview state
+
+    - `hooks/use-citation-connector.ts`: Hook for connecting citations to PDF viewer
+
+    - `lib/citations/citation-formatter.ts`: Utility to format message text with citation numbers
+
+    - `lib/citations/citation-parser.ts`: Parser for citation data from API responses
+
+    - `lib/actions/citation-tracking.ts`: Server actions for citation data management
+
+    - `styles/citation.css`: Citation-specific styles and animations
+
+    - `types/citation.ts`: TypeScript types for citation data structures
+
+    - `components/ui/tooltip.tsx`: Enhanced tooltip component for citation previews
+
+    - `app/api/citations/[id]/route.ts`: API endpoint for individual citation data
+
+  - **Step Dependencies**: Step 9, 11
+
+  - **User Instructions**: None
+
+  
+
+## Credit System and Subscription Management
+
+  
+
+- [ ] Step 13: Implement basic credit system
+
+  - **Task**: Create a simplified credit system with database tracking and midnight refresh for free tier
+
+  - **Files**:
+
+    - `db/schema/user_credits.ts`: Credit balance tracking schema
+
+    - `db/schema/credit_transactions.ts`: Transaction history schema
+
+    - `lib/credits/credit-manager.ts`: Basic credit management functions
+
+    - `lib/credits/free-tier.ts`: Free tier management with midnight refresh logic
+
+    - `lib/actions/credits.ts`: Server actions for checking and deducting credits
+
+    - `components/credits/credit-balance.tsx`: Simple credit balance display component
+
+    - `components/credits/low-credit-warning.tsx`: Warning for low credits
+
+    - `hooks/use-credits.ts`: Hook for checking credit balance
+
+    - `app/api/credits/check/route.ts`: API endpoint for credit availability checking
+
+    - `app/api/credits/deduct/route.ts`: API endpoint for deducting credits after message completion
+
+    - `app/api/credits/refresh/route.ts`: API endpoint to handle midnight credit refresh
+
+    - `types/credits.ts`: TypeScript types for credit-related structures
+
+  - **Step Dependencies**: Step 4, 7, 9
+
+  - **User Instructions**: None
+
+  
+
+- [ ] Step 14: Create placeholder subscription UI
+
+  - **Task**: Build a basic subscription interface with "Coming Soon" messaging for payment features
+
+  - **Files**:
+
+    - `db/schema/subscription_plans.ts`: Schema for plan definitions
+
+    - `lib/subscription/plans.ts`: Subscription plan configuration
+
+    - `components/subscription/plan-display.tsx`: Display component for subscription plans
+
+    - `components/subscription/pricing-table.tsx`: Pricing table with future payment messaging
+
+    - `components/subscription/coming-soon-badge.tsx`: Badge indicating payment features coming soon
+
+    - `components/subscription/upgrade-prompt.tsx`: Prompt for upgrading when out of credits
+
+    - `app/(dashboard)/subscription/page.tsx`: Basic subscription information page
+
+    - `types/subscription.ts`: TypeScript types for subscription data
+
+  - **Step Dependencies**: Step 13
+
+  - **User Instructions**: None
+
+  
+
+- [ ] Step 15: Add free tier functionality
+
+  - **Task**: Implement free tier with daily credit refresh
+
+  - **Files**:
+
+    - `lib/credits/free-tier.ts`: Free tier management logic
+
+    - `lib/actions/free-credits.ts`: Server action for refreshing free credits
+
+    - `components/credits/free-tier-info.tsx`: Component displaying free tier information
+
+    - `app/api/credits/refresh/route.ts`: API endpoint to handle free credit refresh
+
+  - **Step Dependencies**: Step 13, 14
+
+  - **User Instructions**: None
+
+  
+
+## User Profile and Account Management
+
+  
+
+- [ ]- [ ] Step 16: Implement user profile management
+
+  - **Task**: Create user profile management with account settings and preferences
+
+  - **Files**:
+
+    - `components/profile/profile-container.tsx`: Main profile page container
+
+    - `components/profile/personal-information.tsx`: Personal info editing form
+
+    - `components/profile/user-preferences.tsx`: User preferences settings panel
+
+    - `components/profile/credit-summary.tsx`: Credit usage and balance display
+
+    - `components/profile/account-actions.tsx`: Account management actions (delete account, etc.)
+
+    - `components/profile/avatar-upload.tsx`: Profile image upload/edit component
+
+    - `components/profile/context-window-settings.tsx`: Assistant context depth configuration
+
+    - `components/profile/domain-preferences.tsx`: Default knowledge domain settings
+
+    - `components/profile/theme-preferences.tsx`: Theme selection component
+
+    - `lib/actions/profile-update.ts`: Server actions for updating profile information
+
+    - `lib/actions/preference-update.ts`: Server actions for updating user preferences
+
+    - `lib/actions/account-deletion.ts`: Server action for account deletion
+
+    - `hooks/use-profile.ts`: Profile data and management hook
+
+    - `hooks/use-preferences.ts`: User preferences hook
+
+    - `app/(dashboard)/profile/page.tsx`: Main profile page
+
+    - `app/(dashboard)/profile/preferences/page.tsx`: Preferences management page
+
+    - `app/(dashboard)/profile/delete-account/page.tsx`: Account deletion confirmation page
+
+    - `types/profile.ts`: TypeScript types for profile data and preferences
+
+  - **Step Dependencies**: Step 4
+
+  - **User Instructions**: None
+
+  
+
+## SEO and Landing Pages
+
+  
+
+- [ ] Step 17: Create SEO-optimized landing pages
+
+  - **Task**: Build conversion-focused landing pages for each knowledge domain with SEO foundation
+
+  - **Files**:
+
+    - `app/(marketing)/page.tsx`: Main landing page with product overview
+
+    - `app/(marketing)/building-regulations/page.tsx`: Building regulations landing page
+
+    - `app/(marketing)/health-safety/page.tsx`: Health and safety landing page
+
+    - `app/(marketing)/immigration/page.tsx`: Immigration regulations landing page  
+
+    - `app/(marketing)/gdpr/page.tsx`: EU GDPR landing page
+
+    - `components/marketing/hero-section.tsx`: Hero section with main value proposition
+
+    - `components/marketing/features-grid.tsx`: Feature highlights with icons
+
+    - `components/marketing/domain-benefits.tsx`: Domain-specific benefits component
+
+    - `components/marketing/pricing-table.tsx`: Pricing options display
+
+    - `components/marketing/demo-container.tsx`: Interactive assistant demo container
+
+    - `components/marketing/demo-chat.tsx`: Simplified demo chat interface
+
+    - `components/marketing/testimonials-slider.tsx`: Testimonials component
+
+    - `components/marketing/cta-section.tsx`: Call-to-action with prominent chat button
+
+    - `components/marketing/faq-accordion.tsx`: Frequently asked questions
+
+    - `components/marketing/navigation-header.tsx`: Marketing pages header
+
+    - `components/marketing/footer.tsx`: Site footer with links and information
+
+    - `lib/seo/metadata.ts`: Dynamic metadata generation functions
+
+    - `lib/seo/keywords.ts`: Target keywords for each knowledge domain
+
+    - `lib/seo/structured-data.ts`: JSON-LD structured data templates
+
+    - `data/marketing/placeholder-content.ts`: Placeholder content for marketing pages
+
+    - `styles/marketing.css`: Marketing-specific styles
+
+    - `public/images/marketing/`: Directory for marketing-related images
+
+  - **Step Dependencies**: None (can be done in parallel)
+
+  - **User Instructions**:
+
+    - Replace placeholder content in `data/marketing/placeholder-content.ts` with final copy
+
+    - Add final testimonials and case studies when available
+
+  
+
+- [ ]- [ ] Step 18: Implement SEO metadata and structured data
+
+  - **Task**: Create comprehensive SEO implementation with metadata, structured data, and technical SEO elements
+
+  - **Files**:
+
+    - `app/sitemap.ts`: Dynamic sitemap generation with priority levels
+
+    - `app/robots.ts`: Robots.txt with appropriate inclusion/exclusion rules
+
+    - `lib/seo/metadata-generator.ts`: Dynamic metadata generation utility
+
+    - `lib/seo/structured-data/software-application.ts`: SoftwareApplication schema
+
+    - `lib/seo/structured-data/service.ts`: Service schema for knowledge domains
+
+    - `lib/seo/structured-data/faq-page.ts`: FAQPage schema for FAQ sections
+
+    - `lib/seo/structured-data/organization.ts`: Organization schema
+
+    - `components/seo/json-ld-wrapper.tsx`: JSON-LD wrapper component
+
+    - `components/seo/meta-tags.tsx`: Comprehensive meta tags component
+
+    - `components/seo/canonical-link.tsx`: Canonical URL component
+
+    - `components/seo/social-metadata.tsx`: OpenGraph and Twitter card metadata
+
+    - `app/(marketing)/layout.tsx`: Marketing pages layout with SEO components
+
+    - `middleware.ts`: Update to handle canonical URLs and redirects
+
+    - `config/seo-config.ts`: Centralized SEO configuration
+
+    - `scripts/generate-static-sitemap.ts`: Build-time sitemap generation script
+
+  - **Step Dependencies**: Step 17
+
+  - **User Instructions**:
+
+    - Review and update SEO configuration in `config/seo-config.ts` with final keywords and descriptions
+
+    - Run `npm run generate-sitemap` after deployment to create a static sitemap
+
+  
+
+## Additional Features and Exports
+
+  
+
+- [ ] Step 19: Implement basic conversation export functionality
+
+  - **Task**: Add the ability to export entire conversations as plain text
+
+  - **Files**:
+
+    - `components/conversation/export-button.tsx`: Export conversation button component
+
+    - `components/conversation/export-dialog.tsx`: Simple confirmation dialog for exports
+
+    - `lib/export/text-formatter.ts`: Plain text formatting utility
+
+    - `lib/export/citation-formatter.ts`: Citation formatting for exports
+
+    - `lib/actions/export-conversation.ts`: Server action to generate export
+
+    - `hooks/use-conversation-export.ts`: Export functionality hook
+
+    - `app/api/export/conversation/[id]/route.ts`: Export API endpoint
+
+    - `types/export.ts`: Export-related type definitions
+
+  - **Step Dependencies**: Step 8, 9
+
+  - **User Instructions**: None
+
+  
+
+- [ ] Step 20: Add error handling and loading states
+
+  - **Task**: Implement comprehensive but straightforward error handling and loading states
+
+  - **Files**:
+
+    - `components/ui/error-display.tsx`: Reusable error display component
+
+    - `components/ui/loading-spinner.tsx`: Professional loading spinner animation
+
+    - `components/ui/skeleton-loader.tsx`: Content skeleton loading placeholders
+
+    - `components/errors/api-error.tsx`: Specific component for API failures
+
+    - `components/errors/auth-error.tsx`: Authentication error handling
+
+    - `components/errors/network-error.tsx`: Network connectivity errors
+
+    - `components/errors/credit-error.tsx`: Credit-related error with upgrade prompt
+
+    - `components/errors/pdf-error.tsx`: PDF loading failure handling
+
+    - `components/loading/chat-loading.tsx`: Chat message loading state
+
+    - `components/loading/pdf-loading.tsx`: PDF document loading state
+
+    - `components/loading/transition-loader.tsx`: Page transition loading effect
+
+    - `lib/errors/error-handler.ts`: Centralized error handling utility
+
+    - `lib/errors/error-logger.ts`: Basic error logging functionality
+
+    - `lib/errors/retry.ts`: Simple retry mechanism for transient errors
+
+    - `hooks/use-error-handler.ts`: React hook for component error handling
+
+    - `hooks/use-loading-state.ts`: React hook for managing loading states
+
+    - `app/error.tsx`: Global error page
+
+    - `app/not-found.tsx`: 404 page
+
+    - `app/global-error.tsx`: Critical error handler
+
+    - `app/(dashboard)/error.tsx`: Dashboard-specific error boundary
+
+    - `styles/loading-animations.css`: CSS for loading animations
+
+    - `types/errors.ts`: Error type definitions
+
+  - **Step Dependencies**: None (can be implemented throughout)
+
+  - **User Instructions**: None
+
+  
+
+- [ ] Step 21: Mobile optimization
+
+  - **Task**: Implement responsive design with prioritized mobile experience for essential functionality
+
+  - **Files**:
+
+    - `components/layout/responsive-layout.tsx`: Layout manager with device-specific rendering
+
+    - `components/layout/mobile-header.tsx`: Mobile-specific header with hamburger menu
+
+    - `components/layout/hamburger-menu.tsx`: Hamburger menu button component
+
+    - `components/layout/mobile-drawer.tsx`: Slide-out drawer for mobile navigation
+
+    - `components/mobile/citation-popup.tsx`: Mobile-optimized citation popup
+
+    - `components/mobile/pdf-fallback.tsx`: Text-based citation fallback for low-end devices
+
+    - `components/mobile/mobile-pdf-viewer.tsx`: Optimized full-screen PDF viewer for mobile
+
+    - `components/mobile/breakpoint-detector.tsx`: Component to detect and adapt to screen sizes
+
+    - `hooks/use-responsive.ts`: Hook for responsive layout management
+
+    - `hooks/use-breakpoint.ts`: Hook for breakpoint detection
+
+    - `hooks/use-mobile-navigation.ts`: Hook for mobile navigation state
+
+    - `lib/responsive/device-detection.ts`: Utilities for device capability detection
+
+    - `lib/responsive/layout-switcher.ts`: Logic for switching layouts based on device
+
+    - `styles/mobile.css`: Mobile-specific styles
+
+    - `styles/tablet.css`: Tablet-specific styles
+
+    - `tailwind.config.js`: Update with custom breakpoints for target devices
+
+  - **Step Dependencies**: Step 6, 9, 11
+
+  - **User Instructions**: None
+
+  
+
+## Final Integration and Testing
+
+  
+
+- [ ]- [ ] Step 22: Connect all components with simple state management
+
+  - **Task**: Implement Zustand for global state management with modular stores
+
+  - **Files**:
+
+    - `package.json`: Add Zustand dependency
+
+    - `lib/state/use-auth-store.ts`: Authentication state store
+
+    - `lib/state/use-user-store.ts`: User data and preferences store
+
+    - `lib/state/use-layout-store.ts`: Layout configuration state
+
+    - `lib/state/use-conversation-store.ts`: Active conversation and messages store
+
+    - `lib/state/use-pdf-store.ts`: PDF viewer state
+
+    - `lib/state/use-subscription-store.ts`: Subscription and credits store
+
+    - `lib/state/use-settings-store.ts`: Application settings store
+
+    - `lib/state/persistence.ts`: Local storage persistence utilities
+
+    - `lib/state/hydration.ts`: State hydration utilities for server rendering
+
+    - `components/providers/hydration-provider.tsx`: State hydration provider
+
+    - `hooks/use-store-selector.ts`: Helper hook for efficient state selection
+
+    - `hooks/use-persisted-state.ts`: Hook for persisted state values
+
+    - `types/state.ts`: TypeScript types for state stores
+
+    - `middleware.ts`: Update to handle auth state synchronization
+
+  - **Step Dependencies**: All previous steps
+
+  - **User Instructions**:
+
+    - Install Zustand with `npm install zustand`
+
+  
+
+- [ ] Step 23: Set up monitoring and analytics
+
+  - **Task**: Add monitoring, analytics, and logging
+
+  - **Files**:
+
+    - `package.json`: Add analytics dependencies
+
+    - `lib/analytics.ts`: Analytics helper functions
+
+    - `components/providers/analytics-provider.tsx`: Analytics provider
+
+    - `app/api/logging/route.ts`: Logging API endpoint
+
+  - **Step Dependencies**: Step 22
+
+  - **User Instructions**: Set up analytics accounts and update environment variables
+
+  
+
+@file product-requirements.md

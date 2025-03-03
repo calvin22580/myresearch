@@ -1,0 +1,943 @@
+---
+description: Technical details about architecture, API design, and endpoints
+globs: app/api//*,lib//,db/**/
+alwaysApply: false
+---
+# Technical Stack & API Documentation
+
+  
+
+This rule provides technical details about the application architecture and API design.
+
+  
+
+## When to Apply
+
+Apply when implementing APIs, database operations, or integrating external services.
+
+  
+
+## File Patterns
+
+app/api/**/*
+
+lib/**/*
+
+db/**/*
+
+  
+  
+
+## 1. Technology Stack
+
+  
+
+### 1.1 Frontend
+
+  
+
+- **Framework**: Next.js 15 with App Router
+
+- **UI Language**: TypeScript 5.x
+
+- **Component Library**: React 19.x
+
+- **Styling**: Tailwind CSS 4.x
+
+- **UI Components**: Shadcn UI
+
+- **State Management**: Zustand
+
+- **Form Handling**: React Hook Form with Zod validation
+
+- **PDF Rendering**: React-PDF
+
+  
+
+### 1.2 Backend
+
+  
+
+- **Runtime**: Next.js Edge Runtime for API routes
+
+- **API Pattern**: Server Actions + API Routes
+
+- **Database ORM**: Drizzle ORM
+
+- **Authentication**: Clerk
+
+  
+
+### 1.3 Infrastructure
+
+  
+
+- **Database**: PostgreSQL (Supabase)
+
+- **File Storage**: Vercel Blob Storage
+
+- **Deployment**: Vercel
+
+- **External APIs**: Pinecone Assistant API
+
+  
+
+### 1.4 Development Tools
+
+  
+
+- **Package Manager**: npm/yarn
+
+- **Code Quality**: ESLint, TypeScript
+
+- **Git Workflow**: GitHub
+
+┌─────────────────────────────────────────────────────────────┐
+
+│                     Client (Next.js App)                     │
+
+│                                                             │
+
+│  ┌─────────────┐  ┌────────────────┐  ┌──────────────────┐  │
+
+│  │   Landing   │  │   Chat UI &    │  │   PDF Viewer &   │  │
+
+│  │    Pages    │  │  Conversation  │  │    Citations     │  │
+
+│  └─────────────┘  └────────────────┘  └──────────────────┘  │
+
+└───────────────────────────┬─────────────────────────────────┘
+
+                            │
+
+┌───────────────────────────▼─────────────────────────────────┐
+
+│                      Next.js Backend                         │
+
+│                                                             │
+
+│  ┌─────────────┐  ┌────────────────┐  ┌──────────────────┐  │
+
+│  │ Server      │  │  API Routes    │  │  Server Actions  │  │
+
+│  │ Components  │  │  (Edge)        │  │                  │  │
+
+│  └─────────────┘  └────────────────┘  └──────────────────┘  │
+
+└─┬───────────────────┬──────────────────────────┬────────────┘
+
+  │                   │                          │
+
+  ▼                   ▼                          ▼
+
+┌────────┐     ┌──────────────┐          ┌──────────────┐
+
+│ Clerk  │     │ Pinecone     │          │ Vercel Blob  │
+
+│ Auth   │     │ Assistant API│          │ Storage      │
+
+└────────┘     └──────────────┘          └──────────────┘
+
+  │                   │                          │
+
+  └───────────────────┼──────────────────────────┘
+
+                      │
+
+                      ▼
+
+               ┌──────────────┐
+
+               │   Database   │
+
+               │  (Supabase PG)   │
+
+               └──────────────┘
+
+  
+
+-- Users table
+
+CREATE TABLE users (
+
+  id TEXT PRIMARY KEY,
+
+  clerk_id TEXT UNIQUE NOT NULL,
+
+  email TEXT UNIQUE NOT NULL,
+
+  display_name TEXT,
+
+  avatar_url TEXT,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- User preferences
+
+CREATE TABLE user_preferences (
+
+  id SERIAL PRIMARY KEY,
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  theme TEXT DEFAULT 'light',
+
+  default_domain TEXT DEFAULT 'building-regulations',
+
+  context_window INTEGER DEFAULT 5,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- Conversations
+
+CREATE TABLE conversations (
+
+  id TEXT PRIMARY KEY,
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  title TEXT,
+
+  domain TEXT,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- Messages
+
+CREATE TABLE messages (
+
+  id TEXT PRIMARY KEY,
+
+  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+
+  content TEXT NOT NULL,
+
+  tokens_used INTEGER,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- Citations
+
+CREATE TABLE citations (
+
+  id TEXT PRIMARY KEY,
+
+  message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+
+  pdf_id TEXT NOT NULL REFERENCES pdfs(id),
+
+  page_number INTEGER,
+
+  highlight_text TEXT,
+
+  position INTEGER,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- PDFs
+
+CREATE TABLE pdfs (
+
+  id TEXT PRIMARY KEY,
+
+  name TEXT NOT NULL,
+
+  blob_url TEXT NOT NULL,
+
+  description TEXT,
+
+  domain TEXT,
+
+  size INTEGER,
+
+  pages INTEGER,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- User credits
+
+CREATE TABLE user_credits (
+
+  id SERIAL PRIMARY KEY,
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  balance INTEGER NOT NULL DEFAULT 0,
+
+  last_refresh TIMESTAMP,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- Credit transactions
+
+CREATE TABLE credit_transactions (
+
+  id SERIAL PRIMARY KEY,
+
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  amount INTEGER NOT NULL,
+
+  message_id TEXT REFERENCES messages(id),
+
+  description TEXT,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+
+-- Subscription plans
+
+CREATE TABLE subscription_plans (
+
+  id TEXT PRIMARY KEY,
+
+  name TEXT NOT NULL,
+
+  description TEXT,
+
+  price DECIMAL(10, 2),
+
+  credits_per_month INTEGER NOT NULL,
+
+  active BOOLEAN DEFAULT true,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+  
+  
+  
+
+## 4. API Endpoints
+
+  
+
+### 4.1 Authentication (Handled by Clerk)
+
+  
+
+Clerk will handle most authentication flows, but we'll need these endpoints:
+
+  
+
+POST /api/webhooks/clerk
+
+  - Webhook handler for Clerk events (user created, updated, deleted)
+
+  - Used to sync Clerk user data with our database
+
+  
+
+GET /api/users/me
+
+  - Get current user data including preferences
+
+  - Returns user object with preferences
+
+### 4.2 Conversation Management
+
+  
+
+GET /api/conversations
+
+  - List user's conversations
+
+  - Query params: limit, offset
+
+  - Returns array of conversation objects
+
+  
+
+POST /api/conversations
+
+  - Create new conversation
+
+  - Body: { title, domain }
+
+  - Returns new conversation object
+
+  
+
+GET /api/conversations/:id
+
+  - Get conversation by ID with messages
+
+  - Query params: limit, offset (for messages)
+
+  - Returns conversation with messages array
+
+  
+
+PUT /api/conversations/:id
+
+  - Update conversation
+
+  - Body: { title, domain }
+
+  - Returns updated conversation
+
+  
+
+DELETE /api/conversations/:id
+
+  - Delete conversation
+
+  - Returns success status
+
+  
+
+### 4.3 Message and Assistant Integration
+
+  
+
+POST /api/messages
+
+  - Send message and get assistant response
+
+  - Body: { conversationId, content, domain, contextDepth }
+
+  - Checks credit availability
+
+  - Deducts credit
+
+  - Calls Pinecone Assistant API
+
+  - Processes citations
+
+  - Returns message and assistant response objects
+
+  
+
+GET /api/messages/:conversationId
+
+  - Get messages for a conversation
+
+  - Query params: limit, offset
+
+  - Returns array of message objects with citations
+
+### 4.4 PDF and Citations
+
+  
+
+GET /api/pdfs
+
+  - List available PDFs
+
+  - Query params: domain, limit, offset
+
+  - Returns array of PDF metadata
+
+  
+
+GET /api/pdfs/:id
+
+  - Get PDF document
+
+  - Returns PDF file or signed URL
+
+  
+
+GET /api/citations/:id
+
+  - Get citation details
+
+  - Returns citation object with PDF details
+
+  
+
+POST /api/pdfs/upload
+
+  - Admin-only endpoint to upload new PDFs
+
+  - Body: multipart form with PDF file and metadata
+
+  - Returns PDF metadata object
+
+  
+
+### 4.5 Credits and Subscription
+
+  
+
+GET /api/credits
+
+  - Get user's credit balance and transaction history
+
+  - Query params: limit, offset (for transactions)
+
+  - Returns credit balance and transactions array
+
+  
+
+POST /api/credits/check
+
+  - Check if user has sufficient credits
+
+  - Body: { amount }
+
+  - Returns boolean and current balance
+
+  
+
+POST /api/credits/deduct
+
+  - Deduct credits from user balance
+
+  - Body: { amount, messageId, description }
+
+  - Returns updated balance
+
+  
+
+POST /api/credits/refresh
+
+  - Refresh free tier credits (triggered by scheduler)
+
+  - No body needed
+
+  - Resets eligible users to 5 credits
+
+  - Returns count of refreshed accounts
+
+  
+
+## 5. Internal API (Server Actions)
+
+  
+
+// User management
+
+async function syncUserWithClerk(clerkUser: ClerkUser): Promise<User>
+
+async function updateUserPreferences(preferences: UserPreferences): Promise<UserPreferences>
+
+  
+
+// Conversation management
+
+async function createConversation(data: CreateConversationInput): Promise<Conversation>
+
+async function updateConversation(id: string, data: UpdateConversationInput): Promise<Conversation>
+
+async function deleteConversation(id: string): Promise<boolean>
+
+  
+
+// Message handling
+
+async function sendMessage(data: SendMessageInput): Promise<{ message: Message, response: Message }>
+
+async function processCitations(messageId: string, citations: Citation[]): Promise<Citation[]>
+
+  
+
+// Credit management
+
+async function checkCreditAvailability(amount: number = 1): Promise<boolean>
+
+async function deductCredits(amount: number, messageId: string): Promise<number>
+
+async function refreshFreeCredits(): Promise<number>
+
+  
+
+// PDF functions
+
+async function uploadPdf(file: File, metadata: PdfMetadata): Promise<Pdf>
+
+async function getPdfUrl(id: string): Promise<string>
+
+  
+
+## 6. Pinecone Assistant API Integration
+
+  
+
+### 6.1 API Client
+
+  
+
+class PineconeClient {
+
+  constructor(apiKey: string, baseUrl: string);
+
+  
+
+  async query({
+
+    prompt: string,
+
+    context: Message[],
+
+    filter?: { domain: string },
+
+  }): Promise<{
+
+    content: string,
+
+    citations: Citation[],
+
+    usage: {
+
+      prompt_tokens: number,
+
+      completion_tokens: number,
+
+      total_tokens: number
+
+    }
+
+  }>;
+
+}
+
+  
+
+### 6.2 Request Format
+
+  
+
+// Example request to Pinecone
+
+const request = {
+
+  prompt: "What are the requirements for fire exits in commercial buildings?",
+
+  context: [
+
+    { role: "user", content: "I'm working on a commercial project" },
+
+    { role: "assistant", content: "I can help with commercial building regulations." }
+
+  ],
+
+  filter: {
+
+    resource: "building-regulations"
+
+  }
+
+};
+
+  
+
+### 6.3 Response Format
+
+  
+
+// Example response from Pinecone
+
+const response = {
+
+  content: "Fire exits in commercial buildings must meet several requirements including...",
+
+  citations: [
+
+    {
+
+      position: 63,
+
+      references: [
+
+        {
+
+          file: {
+
+            id: "cbecaa37-2943-4030-b4d6-ce4350ab774a",
+
+            name: "UK-Building-Regs-2023.pdf",
+
+            status: "Available"
+
+          },
+
+          pages: [78],
+
+          highlight: {
+
+            type: "text",
+
+            content: "Commercial buildings must have fire exits that open in the direction of travel..."
+
+          }
+
+        }
+
+      ]
+
+    }
+
+  ],
+
+  usage: {
+
+    prompt_tokens: 2490,
+
+    completion_tokens: 433,
+
+    total_tokens: 2923
+
+  }
+
+};
+
+  
+
+## 7. Vercel Blob Storage Integration
+
+  
+
+### 7.1 PDF Storage and Retrieval
+
+  
+
+// Upload PDF
+
+async function uploadPdf(file: File, filename: string): Promise<string> {
+
+  const { url } = await put(filename, file, {
+
+    access: 'public',
+
+    contentType: 'application/pdf'
+
+  });
+
+  return url;
+
+}
+
+  
+
+// Get PDF
+
+async function getPdf(url: string): Promise<Blob> {
+
+  return await fetch(url).then(res => res.blob());
+
+}
+
+  
+
+## 8. Error Handling
+
+  
+
+### 8.1 Error Codes and Responses
+
+  
+
+All API endpoints should return errors in this format:
+
+  
+
+interface ErrorResponse {
+
+  error: {
+
+    code: string;      // Error code
+
+    message: string;   // User-friendly message
+
+    details?: any;     // Additional error details (not exposed to client)
+
+  };
+
+  status: number;      // HTTP status code
+
+}
+
+  
+
+Common error codes:
+
+  
+
+- `UNAUTHORIZED`: User not authenticated
+
+- `FORBIDDEN`: User doesn't have permission
+
+- `NOT_FOUND`: Resource not found
+
+- `INSUFFICIENT_CREDITS`: User doesn't have enough credits
+
+- `RATE_LIMITED`: Too many requests
+
+- `INVALID_INPUT`: Invalid request parameters
+
+- `SERVICE_UNAVAILABLE`: External service unavailable
+
+- `INTERNAL_ERROR`: Unexpected server error
+
+  
+
+## 9. Authentication and Authorization
+
+  
+
+### 9.1 Clerk Integration
+
+  
+
+Clerk handles authentication including:
+
+  
+
+- Email/password login
+
+- Google OAuth
+
+- Microsoft OAuth
+
+- Session management
+
+- Password reset
+
+  
+
+### 9.2 Custom Authorization
+
+  
+
+// Middleware to protect routes
+
+export function withAuth(middleware: NextMiddleware) {
+
+  return async (request: NextRequest) => {
+
+    const { userId } = auth();
+
+    if (!userId) {
+
+      return NextResponse.redirect('/sign-in');
+
+    }
+
+    return middleware(request);
+
+  };
+
+}
+
+  
+
+// Check resource access
+
+async function canAccessResource(userId: string, resourceId: string, type: string): Promise<boolean> {
+
+  // Check if user owns or has access to the resource
+
+  // Used for conversations, messages, etc.
+
+}
+
+  
+
+## 10. Development and Deployment
+
+  
+
+### 10.1 Environment Variables
+
+  
+
+Required environment variables:
+
+  
+
+# Clerk
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+
+CLERK_SECRET_KEY=
+
+CLERK_WEBHOOK_SECRET=
+
+  
+
+# Database
+
+DATABASE_URL=
+
+  
+
+# Pinecone
+
+PINECONE_API_KEY=
+
+PINECONE_BASE_URL=
+
+  
+
+# Vercel Blob
+
+BLOB_READ_WRITE_TOKEN=
+
+  
+
+### 10.2 Build and Deployment
+
+  
+
+# Development
+
+npm run dev
+
+  
+
+# Build
+
+npm run build
+
+  
+
+# Deploy (automatic with Vercel Git integration)
+
+git push origin main
+
+  
+
+@file coding-guidelines.md

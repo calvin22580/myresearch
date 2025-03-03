@@ -1,0 +1,238 @@
+---
+description: 
+globs: app/sign-in//*,app/sign-up//,components/auth/**/,lib/auth/**/*,middleware.ts
+alwaysApply: false
+---
+## 2. Auth Implementation Rule
+
+```markdown
+# Authentication Implementation Rule
+
+This rule provides guidance for implementing authentication in My-Research.ai using Clerk.
+
+## When to Apply
+Apply when working on authentication flows, user management, or protected routes.
+
+## File Patterns
+app/sign-in/**/*
+app/sign-up/**/*
+components/auth/**/*
+lib/auth/**/*
+middleware.ts
+
+## Authentication System Overview
+
+My-Research.ai uses Clerk for authentication, supporting:
+- Email/password authentication
+- Google OAuth
+- Microsoft OAuth
+
+### Clerk Integration
+
+The implementation involves setting up Clerk with Next.js, creating custom sign-in and sign-up pages, and synchronizing user data with our database.
+
+## Implementation Steps
+
+1. **Install Clerk dependencies**
+   ```bash
+   npm install @clerk/nextjs
+
+2 Configure environment variables
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+CLERK_WEBHOOK_SECRET=whsec_...
+
+3. Set up middleware for route protection
+
+// middleware.ts
+import { authMiddleware } from "@clerk/nextjs";
+
+export default authMiddleware({
+  publicRoutes: [
+    "/",
+    "/building-regulations",
+    "/health-safety",
+    "/immigration",
+    "/gdpr",
+    "/api/webhooks/clerk"
+  ],
+});
+
+export const config = {
+  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
+};
+
+4. Add ClerkProvider to root layout
+
+// app/layout.tsx
+import { ClerkProvider } from '@clerk/nextjs';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <ClerkProvider>
+        <body>{children}</body>
+      </ClerkProvider>
+    </html>
+  );
+}
+
+5. Create custom sign-in page
+
+
+// app/sign-in/[[...sign-in]]/page.tsx
+import { SignIn } from "@clerk/nextjs";
+
+export default function SignInPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <SignIn 
+        appearance={{
+          elements: {
+            formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+          }
+        }} 
+      />
+    </div>
+  );
+}
+
+6. Create custom sign-up page
+
+Create custom sign-up page
+
+// app/sign-up/[[...sign-up]]/page.tsx
+import { SignUp } from "@clerk/nextjs";
+
+export default function SignUpPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <SignUp 
+        appearance={{
+          elements: {
+            formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+          }
+        }} 
+      />
+    </div>
+  );
+}
+
+7. Create webhook handler for user sync
+
+// app/api/webhooks/clerk/route.ts
+import { WebhookEvent } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
+import { Webhook } from "svix";
+import { syncUserWithDatabase } from "@/lib/auth/user-sync";
+
+export async function POST(req: Request) {
+  const headersList = headers();
+  const svixId = headersList.get("svix-id");
+  const svixTimestamp = headersList.get("svix-timestamp");
+  const svixSignature = headersList.get("svix-signature");
+  
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return new Response("Missing svix headers", { status: 400 });
+  }
+  
+  const payload = await req.json();
+  const body = JSON.stringify(payload);
+  
+  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
+  
+  try {
+    const evt = wh.verify(body, {
+      "svix-id": svixId,
+      "svix-timestamp": svixTimestamp,
+      "svix-signature": svixSignature,
+    }) as WebhookEvent;
+    
+    // Handle the webhook
+    const eventType = evt.type;
+    
+    if (eventType === "user.created" || eventType === "user.updated") {
+      await syncUserWithDatabase(evt.data);
+    }
+    
+    return new Response("Webhook processed", { status: 200 });
+  } catch (err) {
+    console.error("Error verifying webhook:", err);
+    return new Response("Error verifying webhook", { status: 400 });
+  }
+}
+
+8. User synchronization with database
+
+// lib/auth/user-sync.ts
+import { db } from "@/db/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
+
+export async function syncUserWithDatabase(userData: any) {
+  const { id, email_addresses, first_name, last_name, image_url } = userData;
+  
+  const existingUser = await db.query.users.findFirst({
+    where: eq(users.clerk_id, id),
+  });
+  
+  if (existingUser) {
+    // Update existing user
+    await db.update(users)
+      .set({
+        email: email_addresses[0]?.email_address,
+        display_name: `${first_name || ''} ${last_name || ''}`.trim(),
+        avatar_url: image_url,
+        updated_at: new Date(),
+      })
+      .where(eq(users.clerk_id, id));
+  } else {
+    // Create new user
+    await db.insert(users)
+      .values({
+        id: crypto.randomUUID(),
+        clerk_id: id,
+        email: email_addresses[0]?.email_address,
+        display_name: `${first_name || ''} ${last_name || ''}`.trim(),
+        avatar_url: image_url,
+      });
+      
+    // Add free tier credits (5) for new users
+    await createInitialCredits(id);
+  }
+}
+
+async function createInitialCredits(userId: string) {
+  // Implementation for adding 5 free credits
+}
+
+9. Protected route pattern
+
+// Example of a protected server component
+import { auth } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
+
+export default function ProtectedPage() {
+  const { userId } = auth();
+  
+  if (!userId) {
+    redirect("/sign-in");
+  }
+  
+  // Render protected content
+}
+
+Usage Guidelines
+
+Use the auth() function to get the current user in server components
+Use the useAuth() hook to get the current user in client components
+Use the <SignedIn> and <SignedOut> components for conditional rendering
+Always synchronize user data with your database after authentication
+Set up proper Clerk webhook handling for user events
+Create custom sign-in and sign-up pages for brand consistency
+Implement proper authorization checks beyond authentication
