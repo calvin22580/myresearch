@@ -4,6 +4,9 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { clerkAppearance } from "@/lib/auth/clerk-config";
 import "./globals.css";
 
+// Force dynamic rendering to avoid static generation issues
+export const dynamic = 'force-dynamic';
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

@@ -2,6 +2,9 @@ import { WebhookEvent } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 
+// Force dynamic rendering to avoid static generation issues
+export const dynamic = 'force-dynamic';
+
 // This is a placeholder function since syncUserWithDatabase is not implemented yet
 // We'll implement this in Step 4 according to the implementation plan
 async function syncUserWithDatabase(userData: any): Promise<void> {

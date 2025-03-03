@@ -1,25 +1,6 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-const publicRoutes = createRouteMatcher([
-  "/",
-  "/building-regulations",
-  "/health-safety",
-  "/immigration",
-  "/gdpr",
-  "/api/webhooks/clerk"
-]);
-
-export default clerkMiddleware(async (auth, request) => {
-  if (!publicRoutes(request)) {
-    // If not a public route and user is not signed in, redirect to sign-in
-    const { userId } = await auth();
-    if (!userId) {
-      const signInUrl = new URL('/sign-in', request.url);
-      signInUrl.searchParams.set('redirect_url', request.url);
-      return Response.redirect(signInUrl);
-    }
-  }
-});
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
@@ -28,4 +9,4 @@ export const config = {
     // Always run for API routes
     '/(api|trpc)(.*)',
   ],
-}; 
+};

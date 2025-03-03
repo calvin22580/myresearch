@@ -941,12 +941,3 @@ git push origin main
   
 
 @file coding-guidelines.md
-
-publicRoutes: [
-  "/",
-  "/building-regulations",
-  "/health-safety",
-  "/immigration",
-  "/gdpr",
-  "/api/webhooks/clerk"
-],
