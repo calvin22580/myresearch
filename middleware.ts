@@ -1,6 +1,12 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export default clerkMiddleware();
+// Use the function form of clerkMiddleware with debugging enabled
+export default clerkMiddleware(
+  (auth, req) => {
+    // Don't need to add protection logic yet since all routes are public by default
+  },
+  { debug: process.env.NODE_ENV === 'development' } // Enable debugging in development
+);
 
 export const config = {
   matcher: [
