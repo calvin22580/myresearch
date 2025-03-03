@@ -1,17 +1,12 @@
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
+import { syncUserWithDatabase } from "@/lib/db/user-sync";
 
 // Force dynamic rendering to avoid static generation issues
 export const dynamic = 'force-dynamic';
 
-// This is a placeholder function since syncUserWithDatabase is not implemented yet
-// We'll implement this in Step 4 according to the implementation plan
-async function syncUserWithDatabase(userData: any): Promise<void> {
-  console.log("User data to sync:", userData);
-  // This will be implemented in Step 4
-}
-
+// Clerk webhook handler that processes user events from Clerk
 export async function POST(req: NextRequest) {
   // Get the headers
   const svixId = req.headers.get("svix-id");
@@ -49,10 +44,15 @@ export async function POST(req: NextRequest) {
     
     if (eventType === "user.created" || eventType === "user.updated") {
       await syncUserWithDatabase(evt.data);
+    } else if (eventType === "user.deleted") {
+      // We could handle user deletion here if needed
+      // await handleUserDeletion(evt.data);
+      console.log(`User deleted event received for: ${JSON.stringify(evt.data)}`);
     }
     
     return NextResponse.json({ success: true });
   } catch (err) {
+    console.error("Error processing webhook:", err);
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
   }
 } 
