@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:generate": "npx drizzle-kit generate",
-    "db:push": "npx drizzle-kit push"
+    "db:push": "npx drizzle-kit push",
+    "install:deps": "npm install --legacy-peer-deps"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.2",
@@ -54,5 +55,9 @@
     "eslint-config-next": "15.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "resolutions": {
+    "cmdk/react": "^19.0.0",
+    "cmdk/react-dom": "^19.0.0"
   }
 }
