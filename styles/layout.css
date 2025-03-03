@@ -1,0 +1,102 @@
+/* Layout transitions and animations */
+
+.panel-transition {
+  transition: width 300ms ease, flex 300ms ease, margin 300ms ease;
+}
+
+.sidebar-transition {
+  transition: width 200ms ease, transform 200ms ease, opacity 200ms ease;
+}
+
+.sidebar-collapsed {
+  width: 4rem;
+}
+
+.sidebar-expanded {
+  width: 16rem;
+}
+
+.content-transition {
+  transition: margin 300ms ease, padding 300ms ease, width 300ms ease;
+}
+
+/* Mobile drawer animations */
+@keyframes drawer-open {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes drawer-close {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* Sheet slide animations */
+@keyframes sheet-open {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheet-close {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* PDF transition animations */
+.pdf-panel-enter {
+  animation: pdf-panel-enter 300ms ease forwards;
+}
+
+.pdf-panel-exit {
+  animation: pdf-panel-exit 300ms ease forwards;
+}
+
+@keyframes pdf-panel-enter {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pdf-panel-exit {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Resize handle styling */
+.resize-handle {
+  width: 4px;
+  background-color: transparent;
+  transition: background-color 150ms ease;
+}
+
+.resize-handle:hover, 
+.resize-handle:active {
+  background-color: hsl(var(--primary) / 0.2);
+} 

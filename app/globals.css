@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../styles/layout.css";
 
 @plugin "tailwindcss-animate";
 
@@ -119,9 +120,15 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import '../styles/layout.css';
+
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
