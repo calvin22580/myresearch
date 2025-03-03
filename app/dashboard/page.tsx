@@ -1,30 +1,49 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import { AdaptiveLayout } from "@/components/layout/adaptive-layout";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 
-interface DashboardLayoutProps {
-  children: ReactNode;
-}
-
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  // Example state for PDF visibility - this would be managed by a more comprehensive
-  // state management solution in a real application
+export default function DashboardPage() {
+  // State for PDF visibility and sidebar
   const [isPdfVisible, setIsPdfVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Toggle PDF visibility (demo functionality for the layout system)
-  const togglePdfVisibility = () => {
-    setIsPdfVisible(!isPdfVisible);
-  };
+  // Toggle functions
+  const togglePdfVisibility = () => setIsPdfVisible(!isPdfVisible);
+  const toggleSidebarCollapsed = () => setSidebarCollapsed(!sidebarCollapsed);
 
-  // Toggle sidebar collapsed state
-  const toggleSidebarCollapsed = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
+  // Dashboard content
+  const dashboardContent = (
+    <div className="flex flex-col items-center justify-center min-h-[400px]">
+      <h1 className="text-2xl font-bold mb-4">My-Research.ai Dashboard</h1>
+      <p className="text-muted-foreground mb-8">Welcome to your research assistant</p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl w-full">
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-lg font-medium mb-2">Recent Conversations</h2>
+          <p className="text-sm text-muted-foreground">You have no conversations yet. Start a new one!</p>
+        </div>
+        
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-lg font-medium mb-2">Available Credits</h2>
+          <p className="text-sm text-muted-foreground">You have 100 credits remaining.</p>
+        </div>
+        
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-lg font-medium mb-2">Recent Documents</h2>
+          <p className="text-sm text-muted-foreground">No recent documents found.</p>
+        </div>
+        
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-lg font-medium mb-2">Account Status</h2>
+          <p className="text-sm text-muted-foreground">Free tier account</p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-screen flex flex-col">
@@ -47,7 +66,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               onToggleCollapse={toggleSidebarCollapsed} 
             />
           }
-          chatContent={children}
+          chatContent={dashboardContent}
           pdfContent={
             isPdfVisible ? (
               <div className="h-full flex items-center justify-center bg-muted/20">
