@@ -11,7 +11,7 @@ import { UserPreference } from "@/types/db";
  */
 export async function getCurrentUserPreferences(): Promise<UserPreferences | null> {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     
     if (!clerkId) {
       return null;
@@ -37,7 +37,7 @@ export async function getCurrentUserPreferences(): Promise<UserPreferences | nul
  */
 export async function updateCurrentUserPreferences(data: UpdatePreferencesInput): Promise<UserPreferences | null> {
   try {
-    const { userId: clerkId } = auth();
+    const { userId: clerkId } = await auth();
     
     if (!clerkId) {
       return null;

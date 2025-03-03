@@ -1,7 +1,6 @@
-import { syncUserWithDatabase } from "@/lib/db/user-sync";
-import { ClerkUserData } from "@/lib/auth/types";
-import { db } from "@/db/db";
-import { users, userCredits } from "@/db/schema";
+import { syncUserWithClerk } from "./lib/repositories/user-repository";
+import { db } from "./db/db";
+import { users, userCredits } from "./db/schema";
 import { eq } from "drizzle-orm";
 
 /**
@@ -9,71 +8,62 @@ import { eq } from "drizzle-orm";
  * Run with: npx tsx test-user-sync.ts
  */
 async function testUserSync() {
-  console.log("Testing user synchronization...");
-  
-  // Create a mock Clerk user
-  const mockClerkUser: ClerkUserData = {
-    id: `clerk-test-${Date.now()}`,
-    email_addresses: [
-      {
-        email_address: `test-${Date.now()}@example.com`,
-        id: "email_123",
-        verification: {
-          status: "verified"
-        }
-      }
-    ],
-    first_name: "Test",
-    last_name: "User",
-    image_url: "https://example.com/avatar.png",
-    created_at: Date.now(),
-    updated_at: Date.now()
-  };
+  console.log("Testing user sync with Clerk...");
   
   try {
-    console.log("Syncing mock user with database...");
-    console.log("User ID:", mockClerkUser.id);
-    console.log("Email:", mockClerkUser.email_addresses[0].email_address);
+    // Create a mock Clerk user
+    const mockClerkUser = {
+      id: `clk_test_${Date.now()}`,
+      emailAddresses: [{ emailAddress: `test.${Date.now()}@example.com` }],
+      firstName: "Test",
+      lastName: "User",
+      imageUrl: "https://example.com/image.jpg",
+    };
+    
+    console.log("Mock Clerk user:", mockClerkUser);
     
     // Call the sync function
-    await syncUserWithDatabase(mockClerkUser);
+    console.log("Syncing user...");
     
-    // Verify user was created in database
-    const user = await db.query.users.findFirst({
-      where: eq(users.clerkId, mockClerkUser.id),
-      with: {
-        preferences: true
-      }
-    });
+    const syncedUser = await syncUserWithClerk(mockClerkUser);
+    console.log("Synced user:", syncedUser);
     
-    if (user) {
-      console.log("\n✅ User successfully created and synced to database!");
-      console.log(JSON.stringify(user, null, 2));
+    // Check if user was created in the database
+    if (syncedUser) {
+      console.log("User was successfully synced with the database!");
       
-      // Verify preferences
-      if (user.preferences) {
-        console.log("\n✅ User preferences created successfully!");
-      } else {
-        console.log("\n❌ User preferences were not created");
-      }
-      
-      // Check for user credits
-      const credits = await db.query.userCredits.findFirst({
-        where: eq(userCredits.userId, user.id)
+      // Query to check if user exists in the database
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, mockClerkUser.id),
       });
       
-      if (credits) {
-        console.log("\n✅ User credits created successfully!");
-        console.log(JSON.stringify(credits, null, 2));
-      } else {
-        console.log("\n❌ User credits were not created");
+      console.log("User in database:", user);
+      
+      // Check if user preferences were created
+      if (user) {
+        const preferences = await db.query.userPreferences.findFirst({
+          where: eq(users.id, user.id),
+        });
+        
+        console.log("User preferences:", preferences);
+        
+        // Check if user credits were created
+        const credits = await db.query.userCredits.findFirst({
+          where: eq(userCredits.userId, user.id),
+        });
+        
+        console.log("User credits:", credits);
       }
     } else {
-      console.error("\n❌ User was not found in database after sync");
+      console.error("Failed to sync user with the database");
     }
   } catch (error) {
-    console.error("\n❌ Error during user sync test:");
-    console.error(error);
+    console.error("Error syncing user:", error);
+    
+    // Print error stack trace for debugging
+    if (error instanceof Error) {
+      console.error(error.stack);
+    }
   }
 }
 
