@@ -1,5 +1,5 @@
 import { WebhookEvent } from "@clerk/nextjs/server";
-import { headers } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 
 // This is a placeholder function since syncUserWithDatabase is not implemented yet
@@ -9,16 +9,17 @@ async function syncUserWithDatabase(userData: any): Promise<void> {
   // This will be implemented in Step 4
 }
 
-export async function POST(req: Request) {
-  const headersList = headers();
-  const svixId = headersList.get("svix-id");
-  const svixTimestamp = headersList.get("svix-timestamp");
-  const svixSignature = headersList.get("svix-signature");
+export async function POST(req: NextRequest) {
+  // Get the headers
+  const svixId = req.headers.get("svix-id");
+  const svixTimestamp = req.headers.get("svix-timestamp");
+  const svixSignature = req.headers.get("svix-signature");
   
   if (!svixId || !svixTimestamp || !svixSignature) {
-    return new Response("Missing svix headers", { status: 400 });
+    return NextResponse.json({ error: "Missing svix headers" }, { status: 400 });
   }
   
+  // Get the body
   const payload = await req.json();
   const body = JSON.stringify(payload);
   
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
   
   if (!webhookSecret) {
-    return new Response("Missing webhook secret", { status: 500 });
+    return NextResponse.json({ error: "Missing webhook secret" }, { status: 500 });
   }
   
   // Create a new Webhook instance with the secret
@@ -44,13 +45,11 @@ export async function POST(req: Request) {
     const eventType = evt.type;
     
     if (eventType === "user.created" || eventType === "user.updated") {
-      // Sync user data with our database (will be implemented in Step 4)
       await syncUserWithDatabase(evt.data);
     }
     
-    return new Response("Webhook processed", { status: 200 });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Error verifying webhook:", err);
-    return new Response("Error verifying webhook", { status: 400 });
+    return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
   }
 } 
