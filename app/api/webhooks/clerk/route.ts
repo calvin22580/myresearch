@@ -8,12 +8,16 @@ export const dynamic = 'force-dynamic';
 
 // Clerk webhook handler that processes user events from Clerk
 export async function POST(req: NextRequest) {
+  // Log headers for debugging
+  console.log("Received webhook with headers:", Object.fromEntries(req.headers.entries()));
+  
   // Get the headers
   const svixId = req.headers.get("svix-id");
   const svixTimestamp = req.headers.get("svix-timestamp");
   const svixSignature = req.headers.get("svix-signature");
   
   if (!svixId || !svixTimestamp || !svixSignature) {
+    console.error("Missing svix headers:", { svixId, svixTimestamp, svixSignature });
     return NextResponse.json({ error: "Missing svix headers" }, { status: 400 });
   }
   
@@ -21,12 +25,19 @@ export async function POST(req: NextRequest) {
   const payload = await req.json();
   const body = JSON.stringify(payload);
   
+  // Log payload for debugging
+  console.log("Webhook payload:", payload);
+  
   // Get the webhook secret from environment variables
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
   
   if (!webhookSecret) {
+    console.error("Missing webhook secret");
     return NextResponse.json({ error: "Missing webhook secret" }, { status: 500 });
   }
+  
+  // Debug first few characters of secret (don't log full secret)
+  console.log("Webhook secret starts with:", webhookSecret.substring(0, 5) + "...");
   
   // Create a new Webhook instance with the secret
   const wh = new Webhook(webhookSecret);
@@ -41,6 +52,7 @@ export async function POST(req: NextRequest) {
     
     // Handle the webhook event
     const eventType = evt.type;
+    console.log("Successfully verified webhook event:", eventType);
     
     if (eventType === "user.created" || eventType === "user.updated") {
       await syncUserWithDatabase(evt.data);
