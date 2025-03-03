@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 // Force dynamic rendering to avoid static generation issues
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage() {
+export default async function OverviewPage() {
   const { userId } = await auth();
   const user = await currentUser();
   
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-12 px-4">
-      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8">Dashboard Overview</h1>
       <div className="bg-card shadow-md rounded-lg p-6 max-w-md w-full">
         <h2 className="text-xl font-semibold mb-4">Welcome, {user?.firstName || "User"}!</h2>
         <p className="text-muted-foreground mb-4">
