@@ -1,12 +1,18 @@
-import { KNOWLEDGE_DOMAINS, KnowledgeDomain } from '@/lib/knowledge-domains';
+import { KnowledgeDomain as BaseDomain } from '@/lib/knowledge-domains';
+
+// Re-export the KnowledgeDomain type
+export type KnowledgeDomain = BaseDomain;
+
+// Re-export KNOWLEDGE_DOMAINS
+export { KNOWLEDGE_DOMAINS } from '@/lib/knowledge-domains';
 
 // Map our application domain IDs to Pinecone Assistant names
 export const PINECONE_ASSISTANT_MAPPING: Record<string, string> = {
-  'building-regulations': 'buildingregulations',
-  'health-safety': 'healthsafety',
+  'building_regulations': 'buildingregulations',
+  'health_safety': 'healthsafety',
   'immigration': 'immigration',
   'gdpr': 'gdpr',
-  'tax-law': 'taxlaw'
+  'tax_law': 'taxlaw'
 };
 
 /**
@@ -15,6 +21,9 @@ export const PINECONE_ASSISTANT_MAPPING: Record<string, string> = {
  * underscore IDs (building_regulations) for backward compatibility
  */
 export function getKnowledgeDomain(id: string): KnowledgeDomain | undefined {
+  // Import KNOWLEDGE_DOMAINS here to avoid circular dependency
+  const { KNOWLEDGE_DOMAINS } = require('@/lib/knowledge-domains');
+  
   // First try to find the domain with the exact ID
   let domain = KNOWLEDGE_DOMAINS.find(domain => domain.id === id);
   
@@ -27,10 +36,7 @@ export function getKnowledgeDomain(id: string): KnowledgeDomain | undefined {
   // If still not found, try converting underscores to hyphens
   if (!domain && id.includes('_')) {
     const hyphenId = id.replace(/_/g, '-');
-    domain = KNOWLEDGE_DOMAINS.find(domain => 
-      hyphenId in PINECONE_ASSISTANT_MAPPING && 
-      domain.id.replace(/_/g, '-') === hyphenId
-    );
+    domain = KNOWLEDGE_DOMAINS.find(domain => domain.id.replace(/_/g, '-') === hyphenId);
   }
   
   return domain;
@@ -44,7 +50,7 @@ export function getPineconeAssistantName(domainId: string): string {
   
   if (!assistantName) {
     // Fall back to building regulations if the domain isn't found
-    return PINECONE_ASSISTANT_MAPPING['building-regulations'];
+    return PINECONE_ASSISTANT_MAPPING['building_regulations'];
   }
   
   return assistantName;
@@ -62,6 +68,9 @@ export function isDomainAvailableInPinecone(domainId: string): boolean {
  * Filters out any domains that don't have a Pinecone Assistant mapping
  */
 export function getAvailablePineconeDomains(): KnowledgeDomain[] {
+  // Import KNOWLEDGE_DOMAINS here to avoid circular dependency
+  const { KNOWLEDGE_DOMAINS } = require('@/lib/knowledge-domains');
+  
   return KNOWLEDGE_DOMAINS.filter(domain => 
     isDomainAvailableInPinecone(domain.id)
   );
@@ -71,9 +80,12 @@ export function getAvailablePineconeDomains(): KnowledgeDomain[] {
  * Get the default Pinecone domain
  */
 export function getDefaultPineconeDomain(): KnowledgeDomain {
-  // First try with hyphen format
+  // Import KNOWLEDGE_DOMAINS here to avoid circular dependency
+  const { KNOWLEDGE_DOMAINS } = require('@/lib/knowledge-domains');
+  
+  // First try with underscore format (which is what we use in our schema)
   let defaultDomain = KNOWLEDGE_DOMAINS.find(
-    domain => domain.id === 'building_regulations' || domain.id === 'building-regulations'
+    domain => domain.id === 'building_regulations'
   );
   
   // If not found, try matching by label
@@ -97,8 +109,15 @@ export function getDefaultPineconeDomain(): KnowledgeDomain {
 }
 
 /**
+ * Add explicit export for getDefaultDomain to match import needs
+ */
+export function getDefaultDomain(): KnowledgeDomain {
+  return getDefaultPineconeDomain();
+}
+
+/**
  * Format domain name for display in the UI
  */
 export function formatDomainForDisplay(domain: KnowledgeDomain): string {
-  return `${domain.name} Expert`;
+  return `${domain.label} Expert`;
 } 

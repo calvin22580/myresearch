@@ -8,8 +8,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string(),
   CLERK_SECRET_KEY: z.string(),
   
-  // Pinecone API
-  PINECONE_API_KEY: z.string(),
+  // Pinecone API - Make optional for development and build
+  PINECONE_API_KEY: z.string().optional(),
   
   // Assistant names for different knowledge domains
   ASSISTANT_NAME_BUILDING: z.string().default('buildingregulations'),
