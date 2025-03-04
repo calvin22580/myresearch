@@ -33,62 +33,56 @@ export function DashboardLayout({
   const [layout, setLayout] = useState(defaultLayout);
 
   return (
-    <div className={cn("h-screen flex flex-col", className)}>
-      <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup
-          direction="horizontal"
-          onLayout={(sizes) => setLayout(sizes)}
-          className="h-full"
-        >
-          {/* Sidebar Panel */}
-          <ResizablePanel
-            defaultSize={layout[0]}
-            collapsible
-            minSize={navCollapsedSize}
-            collapsedSize={navCollapsedSize}
-            onCollapse={() => setIsCollapsed(true)}
-            onExpand={() => setIsCollapsed(false)}
-            className={cn(
-              "bg-background border-r transition-all duration-300 ease-in-out",
-              isCollapsed ? "min-w-[50px]" : "min-w-[200px]"
-            )}
-          >
-            <div className="h-full p-2">
-              {sidebar}
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          {/* Main Content Panel */}
-          <ResizablePanel 
-            defaultSize={layout[1]} 
-            minSize={30}
-            className="bg-background"
-          >
-            <div className="h-full p-4 overflow-auto">
-              {content || children}
-            </div>
-          </ResizablePanel>
-
-          {pdfPanel && (
-            <>
-              <ResizableHandle withHandle />
-              
-              {/* PDF Viewer Panel (optional) */}
-              <ResizablePanel 
-                defaultSize={layout[2]} 
-                minSize={20}
-                className="bg-background"
-              >
-                <div className="h-full overflow-auto">
-                  {pdfPanel}
-                </div>
-              </ResizablePanel>
-            </>
+    <div className={cn("h-full", className)}>
+      <ResizablePanelGroup
+        direction="horizontal"
+        onLayout={(sizes) => setLayout(sizes)}
+        className="h-full"
+      >
+        {/* Sidebar Panel */}
+        <ResizablePanel
+          defaultSize={layout[0]}
+          collapsible
+          minSize={navCollapsedSize}
+          collapsedSize={navCollapsedSize}
+          onCollapse={() => setIsCollapsed(true)}
+          onExpand={() => setIsCollapsed(false)}
+          className={cn(
+            "bg-background border-r transition-all duration-300 ease-in-out",
+            isCollapsed ? "min-w-[50px]" : "min-w-[200px]"
           )}
-        </ResizablePanelGroup>
-      </div>
+        >
+          <div className="h-full p-2">
+            {sidebar}
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        {/* Main Content Panel */}
+        <ResizablePanel 
+          defaultSize={layout[1]} 
+          minSize={30}
+          className="bg-background"
+        >
+          {content || children}
+        </ResizablePanel>
+
+        {pdfPanel && (
+          <>
+            <ResizableHandle withHandle />
+            
+            {/* PDF Viewer Panel (optional) */}
+            <ResizablePanel 
+              defaultSize={layout[2]} 
+              minSize={20}
+              className="bg-background"
+            >
+              {pdfPanel}
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
     </div>
   );
 } 
