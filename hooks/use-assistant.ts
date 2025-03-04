@@ -4,16 +4,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { KnowledgeDomain, TokenUsage, FormattedCitation } from '@/lib/pinecone/types';
 import { nanoid } from 'nanoid';
-import {
-  AssistantState,
-  AssistantResponse,
-  AssistantErrorResponse,
-  ChatMessage,
-  SendMessageParams,
-  MessageErrorType,
-} from '@/types/assistant';
-import { getDefaultPineconeDomain, getAvailablePineconeDomains } from '@/lib/pinecone/knowledge-domains';
+import { ChatMessage } from '@/types/assistant';
+import { getDefaultDomain, getAvailablePineconeDomains } from '@/lib/pinecone/knowledge-domains';
 import { insertCitationMarkers } from '@/lib/pinecone/citation-parser';
+import { createConversation } from '@/lib/actions/conversation';
 
 // Default context depth settings
 const DEFAULT_CONTEXT_DEPTH = 10;
@@ -52,160 +46,295 @@ interface UseAssistantOptions {
 }
 
 /**
- * React hook for managing assistant state and interactions
+ * Hook for interacting with the assistant API
  */
 export function useAssistant(
-  conversationId: string,
-  knowledgeDomain: KnowledgeDomain = 'building_regulations',
-  contextDepth: number = 10,
+  initialConversationId?: string,
+  initialKnowledgeDomain: KnowledgeDomain = 'building_regulations',
+  initialContextDepth: number = DEFAULT_CONTEXT_DEPTH,
   options: UseAssistantOptions = {}
 ) {
   const router = useRouter();
+  const { initialMessages = [], onError, onSuccess } = options;
+  
+  // Add state for conversation ID, domain, and context depth
+  const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId);
+  const [selectedDomain, setKnowledgeDomain] = useState<KnowledgeDomain>(initialKnowledgeDomain);
+  const [contextDepth, setContextDepth] = useState<number>(initialContextDepth);
+  
   const [state, setState] = useState<AssistantState>({
     isLoading: false,
     error: null,
-    messages: options.initialMessages || [],
+    messages: initialMessages,
     lastTokenUsage: null,
     remainingCredits: null
   });
-
-  const sendMessage = useCallback(async (message: string) => {
-    if (!message.trim()) return;
+  
+  // Reset error function
+  const resetError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+  
+  /**
+   * Helper function to send a message with a specific conversation ID
+   */
+  const sendMessageWithId = useCallback(async (messageContent: string, specificConversationId: string) => {
+    console.log(`🚀 Sending message to assistant with specific ID:`, messageContent, `conversationId: ${specificConversationId}`);
+    
+    if (!messageContent || !specificConversationId) {
+      console.error('❌ Message content or conversation ID is missing');
+      setState(prev => ({
+        ...prev,
+        error: 'Message content or conversation ID is missing'
+      }));
+      return;
+    }
+    
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     // Create a temporary message ID
     const tempMessageId = nanoid();
     
-    // Add user message to state immediately
-    const userMessage: AssistantMessage = {
-      id: tempMessageId,
-      content: message,
-      role: 'user',
-      createdAt: new Date().toISOString()
-    };
-    
+    // Immediately add the user message to the state
     setState(prev => ({
       ...prev,
-      isLoading: true,
-      error: null,
-      messages: [...prev.messages, userMessage]
+      messages: [
+        ...prev.messages,
+        {
+          id: tempMessageId,
+          content: messageContent,
+          role: 'user',
+          createdAt: new Date().toISOString()
+        }
+      ]
     }));
     
     try {
-      // Make API request to assistant endpoint
-      const response = await fetch('/api/assistant', {
+      // Make the API call to the assistant
+      const response = await fetch(`/api/assistant`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          conversationId,
-          message,
-          knowledgeDomain,
+          message: messageContent,
+          conversationId: specificConversationId,
+          domain: selectedDomain,
           contextDepth
-        })
+        }),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
-        
-        // Handle credit limit errors
-        if (response.status === 403 && errorData.type === 'credit') {
-          setState(prev => ({
-            ...prev,
-            isLoading: false,
-            error: 'Credit limit reached',
-            remainingCredits: errorData.availableCredits || 0
-          }));
-          
-          // Redirect to subscription page if credits are exhausted
-          router.push('/subscription?reason=credit_limit');
-          return;
-        }
-        
-        throw new Error(errorData.error || 'Failed to get response from assistant');
+        throw new Error(errorData.error || 'Failed to send message');
       }
       
       const data: AssistantResponse = await response.json();
       
-      // Add assistant message to state
-      const assistantMessage: AssistantMessage = {
-        id: data.messageId,
-        content: data.message,
-        role: 'assistant',
-        createdAt: new Date().toISOString(),
-        citations: data.citations
-      };
+      // Update the state with the assistant's response
+      setState(prev => {
+        // Process the content with citation markers
+        const processedContent = insertCitationMarkers(data.message, data.citations);
+        
+        return {
+          ...prev,
+          isLoading: false,
+          messages: [
+            ...prev.messages,
+            {
+              id: data.messageId,
+              content: processedContent,
+              role: 'assistant',
+              createdAt: new Date().toISOString(),
+              citations: data.citations
+            }
+          ],
+          lastTokenUsage: data.tokenUsage,
+          remainingCredits: data.remainingCredits
+        };
+      });
+      
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess(data);
+      }
+      
+      // Force a refresh of the conversation list
+      router.refresh();
+      
+      return data;
+    } catch (error: any) {
+      console.error('❌ Error from assistant API:', error);
       
       setState(prev => ({
         ...prev,
         isLoading: false,
-        messages: [...prev.messages, assistantMessage],
-        lastTokenUsage: data.tokenUsage,
-        remainingCredits: data.remainingCredits
+        error: error.message || 'Error communicating with assistant'
       }));
       
-      // Call onSuccess callback if provided
-      if (options.onSuccess) {
-        options.onSuccess(data);
+      // Call error callback if provided
+      if (onError && error instanceof Error) {
+        onError(error);
       }
-    } catch (error) {
-      console.error('Error sending message to assistant:', error);
       
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'An unknown error occurred'
-      }));
-      
-      // Call onError callback if provided
-      if (options.onError && error instanceof Error) {
-        options.onError(error);
-      }
+      return undefined;
     }
-  }, [conversationId, knowledgeDomain, contextDepth, router, options]);
-
-  const resetError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null }));
+  }, [contextDepth, onError, onSuccess, selectedDomain, router]);
+  
+  /**
+   * Send a message to the assistant
+   */
+  const sendMessage = useCallback(async (messageContent: string) => {
+    console.log(`🚀 Sending message to assistant:`, messageContent, `conversationId: ${conversationId}`);
+    
+    if (!messageContent || !conversationId) {
+      console.error('❌ Message content or conversation ID is missing');
+      setState(prev => ({
+        ...prev,
+        error: 'Message content or conversation ID is missing'
+      }));
+      return;
+    }
+    
+    return sendMessageWithId(messageContent, conversationId);
+  }, [conversationId, sendMessageWithId]);
+  
+  /**
+   * Fetch messages for the conversation
+   */
+  const fetchMessages = useCallback(async () => {
+    if (!conversationId) {
+      console.error('❌ Cannot fetch messages: conversation ID is missing');
+      return [];
+    }
+    
+    console.log(`🔄 Fetching messages for conversation: ${conversationId}`);
+    setState(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/messages`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch messages: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`📚 Fetched ${data.messages?.length || 0} messages`);
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        messages: data.messages || []
+      }));
+      
+      return data.messages || [];
+    } catch (error: any) {
+      console.error('❌ Error fetching messages:', error);
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Error fetching messages'
+      }));
+      
+      return [];
+    }
+  }, [conversationId]);
+  
+  // Update context depth with validation
+  const handleSetContextDepth = useCallback((depth: number) => {
+    console.log(`🔢 Setting context depth to: ${depth}`);
+    const validDepth = Math.min(Math.max(depth, MIN_CONTEXT_DEPTH), MAX_CONTEXT_DEPTH);
+    setContextDepth(validDepth);
   }, []);
-
+  
+  // Update domain with logging
+  const handleSetKnowledgeDomain = useCallback((domain: KnowledgeDomain) => {
+    console.log(`🔍 Setting knowledge domain to: ${domain}`);
+    setKnowledgeDomain(domain);
+  }, []);
+  
+  // Set conversation ID with logging
+  const handleSetConversationId = useCallback((id: string) => {
+    console.log(`💬 Setting conversation ID to: ${id}`);
+    setConversationId(id);
+  }, []);
+  
+  /**
+   * Create a new conversation and send the first message
+   */
+  const createNewConversation = useCallback(async (messageContent: string, domain: KnowledgeDomain) => {
+    console.log(`🔍 Creating new conversation with message: ${messageContent} and domain: ${domain}`);
+    
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      // Clear existing messages
+      setState(prev => ({
+        ...prev,
+        messages: []
+      }));
+      
+      // Create a new conversation
+      const result = await createConversation(messageContent, domain);
+      const newConversationId = result.id;
+      
+      console.log(`✅ Created new conversation: ${newConversationId}`);
+      
+      // Update the conversation ID and domain
+      setConversationId(newConversationId);
+      setKnowledgeDomain(domain);
+      
+      // Add the user message to the state
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        messages: [
+          {
+            id: nanoid(),
+            content: messageContent,
+            role: 'user',
+            createdAt: new Date().toISOString()
+          }
+        ]
+      }));
+      
+      // Send the message to get an assistant response
+      setTimeout(() => {
+        sendMessageWithId(messageContent, newConversationId).catch(error => {
+          console.error('❌ Error sending initial message:', error);
+        });
+      }, 100);
+      
+      return newConversationId;
+    } catch (error: any) {
+      console.error('❌ Error creating conversation:', error);
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Error creating conversation'
+      }));
+      
+      // Call the error callback if provided
+      if (onError && error instanceof Error) {
+        onError(error);
+      }
+      
+      return undefined;
+    }
+  }, [onError, sendMessageWithId]);
+  
   return {
+    ...state,
     sendMessage,
+    fetchMessages,
     resetError,
-    isLoading: state.isLoading,
-    error: state.error,
-    messages: state.messages,
-    lastTokenUsage: state.lastTokenUsage,
-    remainingCredits: state.remainingCredits
+    selectedDomain,
+    contextDepth,
+    setKnowledgeDomain: handleSetKnowledgeDomain,
+    setContextDepth: handleSetContextDepth,
+    setConversationId: handleSetConversationId,
+    createNewConversation
   };
 }
-
-// Helper function to fetch messages for a conversation
-const fetchMessages = async (conversationId: string) => {
-  // Implementation of fetchMessages function
-};
-
-// Set the knowledge domain
-const setKnowledgeDomain = useCallback((domain: KnowledgeDomain) => {
-  // Implementation of setKnowledgeDomain function
-}, []);
-
-// Set the context depth
-const setContextDepth = useCallback((depth: number) => {
-  const validDepth = Math.min(Math.max(depth, MIN_CONTEXT_DEPTH), MAX_CONTEXT_DEPTH);
-  // Implementation of setContextDepth function
-}, []);
-
-// Clear any error
-const clearError = useCallback(() => {
-  // Implementation of clearError function
-}, []);
-
-return {
-  state,
-  sendMessage,
-  setKnowledgeDomain,
-  setContextDepth,
-  clearError,
-  availableDomains: getAvailablePineconeDomains(),
-  conversationId,
-  fetchMessages,
-};
-} 

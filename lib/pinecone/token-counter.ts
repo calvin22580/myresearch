@@ -33,8 +33,11 @@ export async function checkCreditAvailability(
   const estimatedCost = (estimatedTokens / 1000) * 0.02;
   
   try {
-    // Make API call to check credit availability
-    const response = await fetch('/api/credits/check', {
+    // Use absolute URL for Edge compatibility
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+
+    // Make API call to check credit availability with absolute URL
+    const response = await fetch(`${baseUrl}/api/credits/check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -48,7 +51,6 @@ export async function checkCreditAvailability(
     }
     
     const data = await response.json();
-    
     return {
       hasCredits: data.hasCredits,
       availableCredits: data.availableCredits,
@@ -56,10 +58,13 @@ export async function checkCreditAvailability(
     };
   } catch (error) {
     console.error('Error checking credit availability:', error);
-    // Default to allowing the request if check fails
+    
+    // Fallback behavior for Edge environment or errors
+    // For now, just allow the request to proceed
+    console.log('⚠️ Using fallback credit check behavior due to error');
     return {
       hasCredits: true,
-      availableCredits: 1000, // Placeholder value
+      availableCredits: 1000, // Default fallback value
       estimatedCost
     };
   }
@@ -101,8 +106,11 @@ export async function trackTokenUsage(
     // Calculate credit cost
     const creditUsage = calculateCreditCost(usage);
     
-    // Make API call to deduct credits
-    const response = await fetch('/api/credits/deduct', {
+    // Use absolute URL for Edge compatibility
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+    
+    // Make API call to deduct credits with absolute URL
+    const response = await fetch(`${baseUrl}/api/credits/deduct`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -114,21 +122,22 @@ export async function trackTokenUsage(
     });
     
     if (!response.ok) {
-      throw new Error('Failed to track token usage');
+      throw new Error('Failed to deduct credits');
     }
     
     const data = await response.json();
-    
     return {
       creditUsage,
       remainingCredits: data.remainingCredits
     };
   } catch (error) {
     console.error('Error tracking token usage:', error);
-    // Return estimated values if tracking fails
+    
+    // Fallback behavior for Edge environment or errors
+    console.log('⚠️ Using fallback token tracking behavior due to error');
     return {
       creditUsage: calculateCreditCost(usage),
-      remainingCredits: 0 // Will be updated on next successful call
+      remainingCredits: 1000 // Default fallback value
     };
   }
 } 

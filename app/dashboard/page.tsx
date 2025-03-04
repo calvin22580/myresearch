@@ -7,9 +7,9 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { ChatWelcome } from "@/components/chat/chat-welcome";
-import { ChatInterface } from "@/components/chat/chat-interface";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquarePlus } from "lucide-react";
+import { ChatContainer } from "@/components/chat/chat-container";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -52,9 +52,8 @@ export default function DashboardPage() {
   
   // Content to show based on whether we have an active conversation
   const contentToShow = activeConversationId ? (
-    <ChatInterface
+    <ChatContainer
       conversationId={activeConversationId}
-      onConversationCreated={handleConversationCreated}
     />
   ) : (
     <ChatWelcome

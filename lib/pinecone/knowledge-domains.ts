@@ -144,4 +144,14 @@ export function getKnowledgeDomainSystemPrompt(domain: KnowledgeDomain): string 
     default:
       return basePrompt;
   }
+}
+
+/**
+ * Format a knowledge domain for display
+ */
+export function formatDomainForDisplay(domain: KnowledgeDomain | { id: string; name: string } | string): string {
+  if (typeof domain === 'string') {
+    return KNOWLEDGE_DOMAINS[domain as KnowledgeDomain]?.name || domain;
+  }
+  return domain.name || domain.id;
 } 

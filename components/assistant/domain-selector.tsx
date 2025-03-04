@@ -13,8 +13,8 @@ import {
 import { Button } from '@/components/ui/button';
 
 interface DomainSelectorProps {
-  selectedDomain: KnowledgeDomain | null;
-  onDomainSelect: (domain: KnowledgeDomain) => void;
+  selectedDomain: string | null;
+  onDomainSelect: (domain: string) => void;
   className?: string;
   buttonVariant?: 'default' | 'outline' | 'ghost';
   isDisabled?: boolean;
@@ -34,9 +34,6 @@ export function DomainSelector({
     ? formatDomainForDisplay(selectedDomain)
     : 'Select Knowledge Domain';
     
-  // Icon to use (either domain specific or default)
-  const DomainIcon = selectedDomain?.icon ? selectedDomain.icon : Lightbulb;
-  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild disabled={isDisabled}>
@@ -46,7 +43,7 @@ export function DomainSelector({
           disabled={isDisabled}
         >
           <div className="flex items-center gap-2 truncate">
-            <DomainIcon className="h-4 w-4" style={selectedDomain?.color ? { color: selectedDomain.color } : {}} />
+            <Lightbulb className="h-4 w-4" />
             <span className="truncate">{selectedDomainDisplay}</span>
           </div>
           <ChevronDown className="h-4 w-4 opacity-50" />
@@ -54,20 +51,16 @@ export function DomainSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[220px]">
         {availableDomains.map((domain) => {
-          const isSelected = domain.id === selectedDomain?.id;
-          const DomainIconComponent = domain.icon || Lightbulb;
+          const isSelected = domain.id === selectedDomain;
           
           return (
             <DropdownMenuItem
               key={domain.id}
               className={`flex items-center gap-2 ${isSelected ? 'bg-accent' : ''}`}
-              onClick={() => onDomainSelect(domain)}
+              onClick={() => onDomainSelect(domain.id)}
             >
-              <DomainIconComponent 
-                className="h-4 w-4 flex-shrink-0" 
-                style={domain.color ? { color: domain.color } : {}} 
-              />
-              <span className="flex-1 truncate">{formatDomainForDisplay(domain)}</span>
+              <Lightbulb className="h-4 w-4 flex-shrink-0" />
+              <span className="flex-1 truncate">{domain.name}</span>
               {isSelected && <Check className="h-4 w-4" />}
             </DropdownMenuItem>
           );

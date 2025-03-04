@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { nanoid } from 'nanoid';
-import { getPineconeClient } from '@/lib/pinecone/client';
+import { getPineconeClient, makePineconeRequest } from '@/lib/pinecone/client';
 import { 
   PineconeAssistantRequest, 
   PineconeAssistantResponse,
@@ -24,8 +24,11 @@ export const runtime = 'edge';
  */
 async function fetchConversationMessages(conversationId: string) {
   try {
+    // Use a proper absolute URL instead of relying on NEXT_PUBLIC_APP_URL
+    // In Next.js Edge runtime, we should use absolute URLs for fetch
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/conversations/${conversationId}/messages`,
+      `${baseUrl}/api/conversations/${conversationId}/messages`,
       { method: 'GET' }
     );
     
@@ -50,8 +53,11 @@ async function saveMessage(
   content: string
 ) {
   try {
+    // Use a proper absolute URL instead of relying on NEXT_PUBLIC_APP_URL
+    // In Next.js Edge runtime, we should use absolute URLs for fetch
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/conversations/${conversationId}/messages`,
+      `${baseUrl}/api/conversations/${conversationId}/messages`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,13 +80,20 @@ async function saveMessage(
   }
 }
 
-// Handle POST requests to /api/assistant
+/**
+ * Handles incoming requests to the assistant API
+ */
 export async function POST(request: NextRequest) {
+  console.log('📥 Received request to assistant API');
   try {
-    // Get authenticated user
-    const { userId } = auth();
+    // Get authenticated user - await the auth result
+    const authResult = await auth();
+    const userId = authResult.userId;
+    
+    console.log('🔒 Auth check:', userId ? 'User authenticated' : 'Not authenticated');
     
     if (!userId) {
+      console.error('❌ Authentication failed: No user ID found');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -88,28 +101,50 @@ export async function POST(request: NextRequest) {
     }
     
     // Parse request body
+    const requestBody = await request.json();
     const { 
       conversationId, 
       message, 
+      messageSummary,
       knowledgeDomain = 'building_regulations' as KnowledgeDomain,
       contextDepth = 10
-    } = await request.json();
+    } = requestBody;
     
-    // Validate required fields
-    if (!conversationId || !message) {
+    // Use either message or messageSummary
+    const messageContent = message || messageSummary;
+    
+    if (!messageContent) {
+      console.error('❌ No message content provided');
       return NextResponse.json(
-        { error: 'Missing required fields: conversationId and message' },
+        { error: 'Message content is required' },
+        { status: 400 }
+      );
+    }
+    
+    if (!conversationId) {
+      console.error('❌ No conversation ID provided');
+      return NextResponse.json(
+        { error: 'Conversation ID is required' },
         { status: 400 }
       );
     }
     
     // Estimate token usage for credit check
-    const estimatedTokens = estimateTokenCount(message) * 10; // Rough estimate
+    const estimatedTokens = estimateTokenCount(messageContent) * 10; // Rough estimate
+    console.log('🔢 Estimated token usage:', estimatedTokens);
     
     // Check if user has sufficient credits
+    console.log('💰 Checking credit availability for user:', userId);
     const creditCheck = await checkCreditAvailability(userId, estimatedTokens);
     
+    console.log('💳 Credit check result:', { 
+      hasCredits: creditCheck.hasCredits, 
+      available: creditCheck.availableCredits,
+      estimated: creditCheck.estimatedCost
+    });
+    
     if (!creditCheck.hasCredits) {
+      console.error('❌ Insufficient credits for user:', userId);
       return NextResponse.json({
         error: 'Insufficient credits',
         availableCredits: creditCheck.availableCredits,
@@ -119,13 +154,17 @@ export async function POST(request: NextRequest) {
     }
     
     // Save user message
+    console.log('💾 Saving user message for conversation:', conversationId);
     const userMessageId = nanoid();
-    await saveMessage(conversationId, 'user', message);
+    await saveMessage(conversationId, 'user', messageContent);
     
     // Fetch conversation history
+    console.log('📚 Fetching conversation history');
     const messages = await fetchConversationMessages(conversationId);
+    console.log(`📝 Fetched ${messages.length} messages from conversation history`);
     
     // Prepare messages for Pinecone
+    console.log('🔄 Preparing messages for Pinecone with context depth:', contextDepth);
     const pineconeMessages = preparePineconeMessages(
       messages,
       contextDepth,
@@ -134,6 +173,7 @@ export async function POST(request: NextRequest) {
     
     // Get the appropriate assistant name based on domain
     const assistantName = getPineconeAssistantName(knowledgeDomain);
+    console.log('🤖 Using assistant:', assistantName, 'for domain:', knowledgeDomain);
     
     // Create request payload
     const payload: PineconeAssistantRequest = {
@@ -142,19 +182,32 @@ export async function POST(request: NextRequest) {
       include_highlights: true
     };
     
-    // Make request to Pinecone
+    // Make request to Pinecone using direct Assistant pattern
     const pc = getPineconeClient();
-    const assistant = pc.Assistant(assistantName);
+    console.log('⚡ Getting assistant:', assistantName);
+    
+    // Use as any to work around the type issue
+    const assistant = (pc as any).Assistant(assistantName);
+    
+    console.log('⚡ Sending chat request to Pinecone');
     const response = await assistant.chat(payload);
+    console.log('📥 Received response from Pinecone API:', JSON.stringify({
+      contentLength: response.content.length,
+      hasCitations: Boolean(response.citations && response.citations.length > 0),
+      citationCount: response.citations?.length || 0
+    }));
     
     // Parse citations
+    console.log('🔍 Parsing citations from response');
     const formattedCitations = parseCitations(response.citations || []);
     
     // Save assistant response
+    console.log('💾 Saving assistant response');
     const assistantMessageId = nanoid();
     await saveMessage(conversationId, 'assistant', response.content);
     
     // Track token usage and deduct credits
+    console.log('📊 Tracking token usage and deducting credits');
     const usageResult = await trackTokenUsage(
       userId, 
       assistantMessageId, 
@@ -162,6 +215,7 @@ export async function POST(request: NextRequest) {
     );
     
     // Return response
+    console.log('📤 Sending response to client');
     return NextResponse.json({
       message: response.content,
       messageId: assistantMessageId,
@@ -170,8 +224,8 @@ export async function POST(request: NextRequest) {
       creditUsage: usageResult.creditUsage,
       remainingCredits: usageResult.remainingCredits
     });
-  } catch (error) {
-    console.error('Assistant API Error:', error);
+  } catch (error: any) {
+    console.error('❌ Assistant API Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'An unknown error occurred' },
       { status: 500 }
