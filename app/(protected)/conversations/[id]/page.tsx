@@ -10,12 +10,20 @@ export async function generateMetadata({
   params: { id: string };
 }): Promise<Metadata> {
   try {
+    if (!params?.id) {
+      return {
+        title: "Conversation Not Found - My-Research.ai",
+        description: "The requested conversation could not be found",
+      };
+    }
+
     const conversation = await getConversation(params.id);
     return {
-      title: `${conversation.title} - My-Research.ai`,
+      title: `${conversation?.title || "New Conversation"} - My-Research.ai`,
       description: "Conversation with My-Research.ai knowledge assistant",
     };
   } catch (error) {
+    console.error("Error generating metadata:", error);
     return {
       title: "Conversation - My-Research.ai",
       description: "Conversation with My-Research.ai knowledge assistant",
@@ -29,12 +37,29 @@ export default async function ConversationPage({
   params: { id: string };
 }) {
   try {
+    if (!params?.id) {
+      console.error("Conversation ID is missing");
+      return notFound();
+    }
+
+    console.log(`Loading conversation: ${params.id}`);
+    
     const conversation = await getConversation(params.id);
+    
+    if (!conversation) {
+      console.error(`Conversation not found: ${params.id}`);
+      return notFound();
+    }
+    
     const domainInfo = getKnowledgeDomain(conversation.domain) || getDefaultDomain();
     
     const handleDomainChange = async (domain: string) => {
       "use server";
-      await updateConversationDomain(params.id, domain);
+      try {
+        await updateConversationDomain(params.id, domain);
+      } catch (error) {
+        console.error("Error updating domain:", error);
+      }
     };
 
     return (
@@ -63,6 +88,7 @@ export default async function ConversationPage({
       </div>
     );
   } catch (error) {
-    notFound();
+    console.error("Error rendering conversation page:", error);
+    return notFound();
   }
 } 

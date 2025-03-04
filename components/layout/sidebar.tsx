@@ -1,8 +1,8 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
@@ -16,13 +16,24 @@ import {
   FileText, 
   Settings, 
   CreditCard,
-  Home
+  Home,
+  Plus
 } from "lucide-react";
+import { getConversations } from "@/lib/actions/conversation";
+import { toast } from "sonner";
 
 interface SidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   className?: string;
+  activeConversationId?: string | null;
+}
+
+interface ConversationItem {
+  id: string;
+  title: string | null;
+  createdAt: Date | null;
+  preview?: string | null;
 }
 
 interface NavItemProps {
@@ -30,16 +41,27 @@ interface NavItemProps {
   icon: ReactNode;
   label: string;
   isCollapsed?: boolean;
+  isActive?: boolean;
 }
 
-function NavItem({ href, icon, label, isCollapsed }: NavItemProps) {
+function NavItem({ href, icon, label, isCollapsed, isActive }: NavItemProps) {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const router = useRouter();
+  const isPathActive = pathname === href;
+  const active = isActive !== undefined ? isActive : isPathActive;
+  const isConversationLink = href.includes('conversation=');
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isConversationLink) {
+      e.preventDefault();
+      router.push(href, { scroll: false });
+    }
+  };
 
   return (
-    <Link href={href} passHref>
+    <Link href={href} passHref onClick={handleClick}>
       <Button
-        variant={isActive ? "secondary" : "ghost"}
+        variant={active ? "secondary" : "ghost"}
         size={isCollapsed ? "icon" : "default"}
         className={cn(
           "w-full justify-start mb-1",
@@ -56,11 +78,16 @@ function NavItem({ href, icon, label, isCollapsed }: NavItemProps) {
 export function Sidebar({ 
   isCollapsed = false, 
   onToggleCollapse, 
-  className 
+  className,
+  activeConversationId
 }: SidebarProps) {
   // Local collapsed state when no control function is provided
   const [localCollapsed, setLocalCollapsed] = useState(isCollapsed);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [conversationsExpanded, setConversationsExpanded] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const collapsed = onToggleCollapse ? isCollapsed : localCollapsed;
+  const router = useRouter();
 
   const handleToggle = () => {
     if (onToggleCollapse) {
@@ -69,6 +96,24 @@ export function Sidebar({
       setLocalCollapsed(!localCollapsed);
     }
   };
+
+  // Fetch user conversations
+  useEffect(() => {
+    async function fetchConversations() {
+      try {
+        setIsLoading(true);
+        const userConversations = await getConversations();
+        setConversations(userConversations as ConversationItem[]);
+      } catch (error) {
+        console.error("Error fetching conversations:", error);
+        toast.error("Could not load conversations");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchConversations();
+  }, [activeConversationId]); // Refresh when active conversation changes
 
   return (
     <div className={cn(
@@ -97,17 +142,68 @@ export function Sidebar({
       <div className="flex-1 overflow-auto px-2">
         <nav className="flex flex-col gap-1">
           <NavItem 
-            href="/"
+            href="/dashboard"
             icon={<Home size={18} />}
             label="Dashboard"
             isCollapsed={collapsed}
           />
-          <NavItem 
-            href="/conversations"
-            icon={<MessageSquare size={18} />}
-            label="Conversations"
-            isCollapsed={collapsed}
-          />
+          
+          {/* Conversations Section */}
+          {!collapsed ? (
+            <Collapsible 
+              open={conversationsExpanded} 
+              onOpenChange={setConversationsExpanded}
+              className="mt-2"
+            >
+              <div className="flex items-center justify-between">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="p-2 w-full justify-start">
+                    <MessageSquare size={18} />
+                    <span className="ml-2">Conversations</span>
+                    <ChevronRight 
+                      size={16} 
+                      className={`ml-auto transition-transform ${conversationsExpanded ? 'rotate-90' : ''}`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="ml-1"
+                  onClick={() => router.push("/dashboard")}
+                >
+                  <Plus size={16} />
+                </Button>
+              </div>
+              
+              <CollapsibleContent className="pl-6 space-y-1 mt-1">
+                {isLoading ? (
+                  <div className="text-sm text-muted-foreground py-1 px-2">Loading...</div>
+                ) : conversations.length > 0 ? (
+                  conversations.map(conversation => (
+                    <NavItem
+                      key={conversation.id}
+                      href={`/dashboard?conversation=${conversation.id}`}
+                      icon={<MessageSquare size={16} />}
+                      label={conversation.title || "Untitled conversation"}
+                      isCollapsed={false}
+                      isActive={activeConversationId === conversation.id}
+                    />
+                  ))
+                ) : (
+                  <div className="text-sm text-muted-foreground py-1 px-2">No conversations yet</div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <NavItem 
+              href="/conversations"
+              icon={<MessageSquare size={18} />}
+              label="Conversations"
+              isCollapsed={collapsed}
+            />
+          )}
+
           <NavItem 
             href="/documents"
             icon={<FileText size={18} />}

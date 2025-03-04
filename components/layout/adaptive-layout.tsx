@@ -37,26 +37,13 @@ export function AdaptiveLayout({
     setLayoutSizes(isPdfActive ? [15, 45, 40] : [20, 80]);
   }, [isPdfActive]);
 
-  // Simple layout when no PDF is shown (centered chat)
-  if (!showPdf) {
-    return (
-      <DashboardLayout
-        sidebar={sidebar}
-        content={chatContent || children}
-        defaultLayout={layoutSizes}
-        className={cn("transition-all duration-300", className)}
-      />
-    );
-  }
-
-  // Full three-panel layout when PDF is shown
   return (
     <DashboardLayout
       sidebar={sidebar}
       content={chatContent || children}
-      pdfPanel={pdfContent}
+      pdfPanel={showPdf ? pdfContent : undefined}
       defaultLayout={layoutSizes}
-      className={cn("transition-all duration-300", className)}
+      className={cn("h-full", className)}
     />
   );
 } 

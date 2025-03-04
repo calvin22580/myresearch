@@ -10,19 +10,16 @@ const createConversationSchema = z.object({
   domainId: z.string().optional(),
 });
 
-export async function GET() {
+/**
+ * GET /api/conversations
+ * Get all conversations for the current user
+ */
+export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
-
     const conversations = await getConversations();
-    
     return NextResponse.json(conversations);
   } catch (error) {
-    console.error('GET /api/conversations error:', error);
+    console.error('Error getting conversations:', error);
     
     if (error instanceof ApiError) {
       return NextResponse.json(
@@ -32,46 +29,35 @@ export async function GET() {
     }
     
     return NextResponse.json(
-      { message: 'Failed to fetch conversations' },
+      { message: 'Failed to get conversations' },
       { status: 500 }
     );
   }
 }
 
+/**
+ * POST /api/conversations
+ * Create a new conversation with an initial message
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
-
     const body = await request.json();
     
-    // Validate the request body
-    const validation = createConversationSchema.safeParse(body);
-    
-    if (!validation.success) {
+    if (!body.message) {
       return NextResponse.json(
-        { message: validation.error.errors[0].message },
+        { message: 'Message is required' },
         { status: 400 }
       );
     }
     
-    const { message, domainId } = validation.data;
+    const conversation = await createConversation(
+      body.message,
+      body.domainId
+    );
     
-    try {
-      const newConversation = await createConversation(message, domainId);
-      return NextResponse.json(newConversation, { status: 201 });
-    } catch (err) {
-      console.error('Detailed creation error:', err);
-      return NextResponse.json(
-        { message: `Failed to create conversation: ${err instanceof Error ? err.message : String(err)}` },
-        { status: 500 }
-      );
-    }
+    return NextResponse.json(conversation);
   } catch (error) {
-    console.error('POST /api/conversations error:', error);
+    console.error('Error creating conversation:', error);
     
     if (error instanceof ApiError) {
       return NextResponse.json(

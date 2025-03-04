@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   /* config options here */
   output: "standalone",
   
@@ -27,7 +26,23 @@ const nextConfig: NextConfig = {
   // Environment variables that will be available at build time
   env: {
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_placeholder',
+  },
+
+  // Simple webpack configuration for Node.js module fallbacks
+  webpack: (config) => {
+    config.resolve.fallback = { 
+      fs: false,
+      path: false,
+      os: false,
+      crypto: false,
+      net: false,
+      tls: false,
+      perf_hooks: false,
+      stream: false
+    };
+    
+    return config;
   }
 };
 
-export default nextConfig;
+module.exports = nextConfig; 

@@ -13,7 +13,7 @@ const client = postgres(process.env.DATABASE_URL!, {
     rejectUnauthorized: false
   },
   prepare: false // Disable prefetch as it is not supported for "Transaction" pool mode
-})
+});
 
 // Export configured database instance with consolidated schema that includes relations
 // This approach fixes the "referencedTable" errors by ensuring all tables and relations 

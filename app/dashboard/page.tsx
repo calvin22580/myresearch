@@ -1,48 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdaptiveLayout } from "@/components/layout/adaptive-layout";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
+import { ChatWelcome } from "@/components/chat/chat-welcome";
+import { ChatInterface } from "@/components/chat/chat-interface";
+import { Button } from "@/components/ui/button";
+import { Loader2, MessageSquarePlus } from "lucide-react";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Get conversation ID from URL if present
+  const conversationIdFromUrl = searchParams.get('conversation');
+  
   // State for PDF visibility and sidebar
   const [isPdfVisible, setIsPdfVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
+  
+  // State for conversation
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    conversationIdFromUrl || null
+  );
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  
+  // Update the active conversation ID whenever the URL changes
+  useEffect(() => {
+    console.log("URL param changed:", conversationIdFromUrl);
+    
+    if (conversationIdFromUrl !== activeConversationId) {
+      setActiveConversationId(conversationIdFromUrl);
+    }
+  }, [conversationIdFromUrl, activeConversationId]);
+  
   // Toggle functions
   const togglePdfVisibility = () => setIsPdfVisible(!isPdfVisible);
   const toggleSidebarCollapsed = () => setSidebarCollapsed(!sidebarCollapsed);
-
-  // Dashboard content
-  const dashboardContent = (
-    <div className="flex flex-col items-center justify-center min-h-[400px]">
-      <h1 className="text-2xl font-bold mb-4">My-Research.ai Dashboard</h1>
-      <p className="text-muted-foreground mb-8">Welcome to your research assistant</p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl w-full">
-        <div className="p-6 border rounded-lg">
-          <h2 className="text-lg font-medium mb-2">Recent Conversations</h2>
-          <p className="text-sm text-muted-foreground">You have no conversations yet. Start a new one!</p>
-        </div>
-        
-        <div className="p-6 border rounded-lg">
-          <h2 className="text-lg font-medium mb-2">Available Credits</h2>
-          <p className="text-sm text-muted-foreground">You have 100 credits remaining.</p>
-        </div>
-        
-        <div className="p-6 border rounded-lg">
-          <h2 className="text-lg font-medium mb-2">Recent Documents</h2>
-          <p className="text-sm text-muted-foreground">No recent documents found.</p>
-        </div>
-        
-        <div className="p-6 border rounded-lg">
-          <h2 className="text-lg font-medium mb-2">Account Status</h2>
-          <p className="text-sm text-muted-foreground">Free tier account</p>
-        </div>
-      </div>
-    </div>
+  
+  // Handle conversation creation and URL updates
+  const handleConversationCreated = (conversationId: string) => {
+    console.log("Conversation created, updating URL and UI:", conversationId);
+    setActiveConversationId(conversationId);
+    
+    // Update URL without navigation
+    router.replace(`/dashboard?conversation=${conversationId}`, { scroll: false });
+  };
+  
+  // Content to show based on whether we have an active conversation
+  const contentToShow = activeConversationId ? (
+    <ChatInterface
+      conversationId={activeConversationId}
+      onConversationCreated={handleConversationCreated}
+    />
+  ) : (
+    <ChatWelcome
+      isLoading={isCreatingConversation}
+      onConversationCreated={handleConversationCreated}
+    />
   );
 
   return (
@@ -52,21 +70,21 @@ export default function DashboardPage() {
         onMenuClick={toggleSidebarCollapsed} 
       />
       
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden">
         {/* Mobile Navigation - Shown on small screens */}
         <div className="block md:hidden absolute z-10 top-4 left-4">
           <MobileNavigation />
         </div>
         
-        {/* Main Layout */}
         <AdaptiveLayout
           sidebar={
             <Sidebar 
               isCollapsed={sidebarCollapsed} 
               onToggleCollapse={toggleSidebarCollapsed} 
+              activeConversationId={activeConversationId}
             />
           }
-          chatContent={dashboardContent}
+          chatContent={contentToShow}
           pdfContent={
             isPdfVisible ? (
               <div className="h-full flex items-center justify-center bg-muted/20">
@@ -90,7 +108,7 @@ export default function DashboardPage() {
         {!isPdfVisible && (
           <button
             onClick={togglePdfVisibility}
-            className="absolute bottom-4 right-4 px-4 py-2 bg-primary text-primary-foreground rounded-md shadow-md"
+            className="absolute bottom-20 right-4 px-4 py-2 bg-primary text-primary-foreground rounded-md shadow-md z-10"
           >
             Open Demo PDF
           </button>

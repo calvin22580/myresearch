@@ -130,11 +130,15 @@ export async function createConversation(
  */
 export async function getConversations() {
   try {
-    const { userId } = await auth();
+    // Use ensureUserExists to get the database user ID
+    const user = await ensureUserExists();
+    const userId = user.id;
 
     if (!userId) {
       throw new Error('Unauthorized');
     }
+
+    console.log('Fetching conversations for user:', userId);
 
     // Get all conversations for the user, ordered by the most recent update
     const userConversations = await db.query.conversations.findMany({
@@ -148,6 +152,8 @@ export async function getConversations() {
         },
       },
     });
+
+    console.log(`Found ${userConversations.length} conversations`);
 
     // Format the response to include the message preview
     return userConversations.map(conversation => {
@@ -174,10 +180,18 @@ export async function getConversations() {
  */
 export async function getConversation(id: string) {
   try {
-    const { userId } = await auth();
+    // Get the database user instead of using Clerk ID directly
+    const user = await ensureUserExists();
+    const userId = user.id;
 
     if (!userId) {
       throw new Error('Unauthorized');
+    }
+
+    console.log(`Attempting to fetch conversation: ${id} for user: ${userId}`);
+
+    if (!id) {
+      throw new Error('Invalid conversation ID');
     }
 
     const conversation = await db.query.conversations.findFirst({
@@ -193,17 +207,20 @@ export async function getConversation(id: string) {
     });
 
     if (!conversation) {
-      throw new Error('Conversation not found');
+      console.error(`Conversation not found: ${id} for user: ${userId}`);
+      throw new Error(`Conversation not found: ${id}`);
     }
 
     // Only return the conversation if it belongs to the authenticated user
     if (conversation.userId !== userId) {
+      console.error(`User ${userId} attempted to access conversation ${id} belonging to ${conversation.userId}`);
       throw new Error('Unauthorized');
     }
 
+    console.log(`Successfully fetched conversation: ${id} with ${conversation.messages.length} messages`);
     return conversation;
   } catch (error) {
-    console.error('Error fetching conversation:', error);
+    console.error(`Error fetching conversation ${id}:`, error);
     throw new Error(generateErrorMessage(error));
   }
 }
@@ -384,6 +401,79 @@ export async function deleteConversation(id: string) {
     return deletedConversation;
   } catch (error) {
     console.error('Error deleting conversation:', error);
+    throw new Error(generateErrorMessage(error));
+  }
+}
+
+/**
+ * Adds a new message to an existing conversation
+ * 
+ * @param conversationId The conversation ID
+ * @param content The message content
+ * @returns The newly created message
+ */
+export async function addMessageToConversation(conversationId: string, content: string) {
+  try {
+    // Get the database user
+    const user = await ensureUserExists();
+    const userId = user.id;
+
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+
+    console.log(`Adding message to conversation: ${conversationId}`);
+    console.log(`Message content: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`);
+
+    // Check if conversation exists and belongs to user
+    const conversation = await db.query.conversations.findFirst({
+      where: and(
+        eq(conversations.id, conversationId),
+        eq(conversations.userId, userId)
+      ),
+    });
+
+    if (!conversation) {
+      throw new Error(`Conversation not found: ${conversationId}`);
+    }
+
+    // Generate a new message ID
+    const messageId = nanoid();
+
+    // Use a transaction to ensure both operations succeed or fail together
+    const [message] = await db.transaction(async (tx) => {
+      // Insert the message
+      const [newMessage] = await tx
+        .insert(messages)
+        .values({
+          id: messageId,
+          conversationId,
+          content,
+          role: 'user',
+          createdAt: new Date(),
+        })
+        .returning();
+
+      if (!newMessage) {
+        throw new Error('Failed to add message');
+      }
+
+      // Update conversation updatedAt timestamp
+      await tx
+        .update(conversations)
+        .set({
+          updatedAt: new Date(),
+        })
+        .where(eq(conversations.id, conversationId));
+
+      return [newMessage];
+    });
+
+    console.log(`Added message: ${message.id}`);
+    
+    return message;
+  } catch (error) {
+    console.error(`Error adding message to conversation ${conversationId}:`, error);
     throw new Error(generateErrorMessage(error));
   }
 } 

@@ -9,6 +9,7 @@ import { User, UserPreference } from "@/types/db";
 import { db } from '@/db/db';
 import { users } from '@/db/schema/prepare-schema';
 import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
 
 /**
  * Get the current user's profile data
@@ -125,19 +126,19 @@ function mapUserToProfile(user: User, preferences: UserPreference): UserProfile 
   return {
     id: user.id,
     clerkId: user.clerkId,
-    email: user.email,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
+    email: user.email || "",
+    displayName: user.displayName || "",
+    avatarUrl: user.avatarUrl || null,
+    createdAt: user.createdAt || new Date(),
+    updatedAt: user.updatedAt || new Date(),
     preferences: {
       id: preferences.id,
       userId: preferences.userId,
-      theme: preferences.theme,
-      defaultDomain: preferences.defaultDomain,
-      contextWindow: preferences.contextWindow,
-      createdAt: preferences.createdAt,
-      updatedAt: preferences.updatedAt,
+      theme: preferences.theme || "system",
+      defaultDomain: preferences.defaultDomain || "building-regulations",
+      contextWindow: preferences.contextWindow || 10,
+      createdAt: preferences.createdAt || new Date(),
+      updatedAt: preferences.updatedAt || new Date(),
     }
   };
 }
@@ -166,12 +167,15 @@ export async function ensureUserExists() {
   // User doesn't exist, create a new record
   console.log('Creating new user record for Clerk ID:', clerkId);
   
+  // Generate a UUID for the user's primary key
+  const userId = crypto.randomUUID();
+  
   // In a real application, you should also fetch user details from the Clerk API
   // and populate all required fields like email, name, etc.
   const [newUser] = await db.insert(users)
     .values({
-      id: clerkId, // Using the clerk ID as our primary key for simplicity
-      clerkId: clerkId,
+      id: userId, // Using a generated UUID as our primary key
+      clerkId: clerkId, // Store the Clerk ID separately
       email: `user-${clerkId.substring(0, 8)}@example.com`, // Placeholder email
       displayName: `User ${clerkId.substring(0, 5)}`, // Placeholder name
     })
