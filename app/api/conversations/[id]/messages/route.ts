@@ -105,11 +105,20 @@ export async function POST(
       );
     }
 
-    console.log(`API: Adding message to conversation ${id}`);
+    // Use role if provided or default to 'user'
+    const role = body.role || 'user';
+    if (role !== 'user' && role !== 'assistant') {
+      return NextResponse.json(
+        { message: 'Role must be either "user" or "assistant"' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`API: Adding ${role} message to conversation ${id}`);
 
     try {
-      // Add the message to the conversation
-      const message = await addMessageToConversation(id, body.content);
+      // Add the message to the conversation with role
+      const message = await addMessageToConversation(id, body.content, role);
       
       // Return the new message
       return NextResponse.json(message);

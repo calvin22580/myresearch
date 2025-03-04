@@ -410,9 +410,14 @@ export async function deleteConversation(id: string) {
  * 
  * @param conversationId The conversation ID
  * @param content The message content
+ * @param role The message role (user or assistant)
  * @returns The newly created message
  */
-export async function addMessageToConversation(conversationId: string, content: string) {
+export async function addMessageToConversation(
+  conversationId: string, 
+  content: string,
+  role: 'user' | 'assistant' = 'user'
+) {
   try {
     // Get the database user
     const user = await ensureUserExists();
@@ -422,7 +427,7 @@ export async function addMessageToConversation(conversationId: string, content: 
       throw new Error('Unauthorized');
     }
 
-    console.log(`Adding message to conversation: ${conversationId}`);
+    console.log(`Adding ${role} message to conversation: ${conversationId}`);
     console.log(`Message content: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`);
 
     // Check if conversation exists and belongs to user
@@ -449,7 +454,7 @@ export async function addMessageToConversation(conversationId: string, content: 
           id: messageId,
           conversationId,
           content,
-          role: 'user',
+          role,
           createdAt: new Date(),
         })
         .returning();

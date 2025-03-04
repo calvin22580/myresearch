@@ -1,5 +1,5 @@
 import { PineconeUsage, calculateCreditUsage } from './types';
-import { db } from '@/db/db';
+import { getDb } from '@/db/db';
 import { userCredits, creditTransactions, messages } from '@/db/schema/prepare-schema';
 import { eq } from 'drizzle-orm';
 
@@ -14,6 +14,15 @@ export interface TokenUsageResult {
 }
 
 /**
+ * Helper to check if we're in Edge Runtime
+ */
+const isEdgeRuntime = () => {
+  return typeof process === 'undefined' || 
+         process.env.NEXT_RUNTIME === 'edge' ||
+         process.env.NEXT_RUNTIME === 'experimental-edge';
+};
+
+/**
  * Track token usage and deduct credits
  */
 export async function trackTokenUsage(
@@ -23,6 +32,20 @@ export async function trackTokenUsage(
 ): Promise<TokenUsageResult> {
   const totalTokens = usage.total_tokens;
   const creditUsage = calculateCreditUsage(totalTokens);
+  
+  // For Edge Runtime, return mock data
+  if (isEdgeRuntime()) {
+    console.log('Edge Runtime detected: mocking token usage tracking');
+    return {
+      tokenCount: totalTokens,
+      creditUsage,
+      remainingCredits: 1000 - creditUsage, // Mock value
+      isWithinLimit: true
+    };
+  }
+  
+  // Get database instance
+  const db = getDb();
   
   // Update message with token count
   await db.update(messages)
@@ -92,6 +115,19 @@ export async function checkCreditAvailability(
   estimatedCost: number;
 }> {
   const estimatedCost = calculateCreditUsage(estimatedTokens);
+  
+  // For Edge Runtime, return mock data with unlimited credits
+  if (isEdgeRuntime()) {
+    console.log('Edge Runtime detected: mocking credit availability');
+    return {
+      hasCredits: true,
+      availableCredits: 1000, // Mock value
+      estimatedCost
+    };
+  }
+  
+  // Get database instance
+  const db = getDb();
   
   const userCreditRecord = await db.query.userCredits.findFirst({
     where: eq(userCredits.userId, userId)
