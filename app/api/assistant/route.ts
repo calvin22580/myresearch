@@ -47,35 +47,57 @@ async function fetchConversationMessages(conversationId: string) {
 /**
  * Saves a message to a conversation
  */
-async function saveMessage(
-  conversationId: string, 
-  role: 'user' | 'assistant', 
-  content: string
-) {
+async function saveMessage(conversationId: string, role: 'user' | 'assistant', content: string) {
   try {
-    // Use a proper absolute URL instead of relying on NEXT_PUBLIC_APP_URL
-    // In Next.js Edge runtime, we should use absolute URLs for fetch
+    // Use environment variable for base URL with fallback
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+    
+    console.log(`Saving ${role} message to conversation ${conversationId}`);
+    
+    // Create headers with content type
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Make the request to the messages API
     const response = await fetch(
-      `${baseUrl}/api/conversations/${conversationId}/messages`,
+      `${baseUrl}/api/conversations/${conversationId}/messages`, 
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role,
-          content
-        })
+        headers,
+        body: JSON.stringify({ 
+          content, 
+          role 
+        }),
       }
     );
     
+    // Check if the response is OK
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Failed to save message: ${response.status} - ${errorText}`);
       throw new Error(`Failed to save message: ${response.status}`);
     }
     
+    // Parse and return the response
     const data = await response.json();
-    return data.messageId;
+    return data;
   } catch (error) {
-    console.error('Error saving message:', error);
+    console.error('Error in saveMessage:', error);
+    
+    // In development, return a mock message object
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Using development fallback for saveMessage');
+      return {
+        id: `mock_${Date.now()}`,
+        conversationId,
+        content,
+        role,
+        createdAt: new Date().toISOString()
+      };
+    }
+    
+    // Re-throw the error for production
     throw error;
   }
 }
