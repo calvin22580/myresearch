@@ -1,12 +1,12 @@
 import { env } from '@/env';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { PineconeAssistantResponse } from './types';
 
 /**
  * Pinecone Assistant API client configuration and utilities
  */
 
 // Pinecone API settings
-const PINECONE_BASE_URL = 'https://prod-1-data.ke.pinecone.io/assistant/chat';
-const PINECONE_API_VERSION = '2025-04';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -26,6 +26,19 @@ export class PineconeMissingApiKeyError extends Error {
     super('Pinecone API key is missing. Please check your environment variables.');
     this.name = 'PineconeMissingApiKeyError';
   }
+}
+
+/**
+ * Initialize the Pinecone client
+ */
+export function getPineconeClient() {
+  const apiKey = env.PINECONE_API_KEY;
+  
+  if (!apiKey) {
+    throw new PineconeMissingApiKeyError();
+  }
+  
+  return new Pinecone({ apiKey });
 }
 
 /**
@@ -55,25 +68,13 @@ export async function makePineconeRequest<T>(
   }
 
   try {
-    const response = await fetch(`${PINECONE_BASE_URL}/${assistantName}`, {
-      method: 'POST',
-      headers: {
-        'Api-Key': apiKey,
-        'Content-Type': 'application/json',
-        'X-Pinecone-API-Version': PINECONE_API_VERSION,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new PineconeApiError(
-        `Pinecone API error: ${response.status} ${errorText}`,
-        response.status
-      );
-    }
-
-    return await response.json() as T;
+    const pc = getPineconeClient();
+    const assistant = pc.Assistant(assistantName);
+    
+    // Use the official SDK to make the request
+    const response = await assistant.chat(payload);
+    
+    return response as unknown as T;
   } catch (error) {
     // Handle retries for specific errors
     if (

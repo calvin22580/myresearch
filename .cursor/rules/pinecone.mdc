@@ -1,0 +1,217 @@
+---
+description: Implementing the pinecone assistant
+globs: 
+alwaysApply: false
+---
+
+import { Pinecone } from '@pinecone-database/pinecone'
+
+const pc = new Pinecone({ apiKey: 'YOUR_API_KEY' });
+const assistantName = 'example-assistant';
+const assistant = pc.Assistant(assistantName);
+const chatResp = await assistant.chat({
+  messages: [{ role: 'user', content: 'What is the inciting incident of Pride and Prejudice?' }]
+});
+console.log(chatResp);
+
+{
+  "finish_reason": "stop",
+  "message": {
+    "role": "assistant",
+    "content": "The inciting incident of \"Pride and Prejudice\" occurs when Mrs. Bennet informs Mr. Bennet that Netherfield Park has been let at last, and she is eager to share the news about the new tenant, Mr. Bingley, who is wealthy and single. This sets the stage for the subsequent events of the story, including the introduction of Mr. Bingley and Mr. Darcy to the Bennet family and the ensuing romantic entanglements."
+  },
+  "id": "00000000000000004ac3add5961aa757",
+  "model": "gpt-4o-2024-05-13",
+  "usage": {
+    "prompt_tokens": 9736,
+    "completion_tokens": 105,
+    "total_tokens": 9841
+  },
+  "citations": [
+    {
+      "position": 406,
+      "references": [
+        {
+          "file": {
+            "status": "Available",
+            "id": "ae79e447-b89e-4994-994b-3232ca52a654",
+            "name": "Pride-and-Prejudice.pdf",
+            "size": 2973077,
+            "metadata": null,
+            "updated_on": "2024-06-14T15:01:57.385425746Z",
+            "created_on": "2024-06-14T15:01:02.910452398Z",
+            "percent_done": 0,
+            "signed_url": "https://storage.googleapis.com/...",
+            "error_message": null
+          },
+          "pages": [
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+
+
+Chat
+Chat with an assistant
+Chat with an assistant and get back citations in structured form.
+
+This is the recommended way to chat with an assistant, as it offers more functionality and control over the assistant’s responses and references than the OpenAI-compatible chat interface.
+
+For guidance and examples, see Chat with an assistant.
+
+POST
+/
+chat
+/
+{assistant_name}
+Authorizations
+​
+Api-Key
+string
+header
+required
+Pinecone API Key
+
+Path Parameters
+​
+assistant_name
+string
+required
+The name of the assistant to be described.
+
+Body
+application/json
+The desired configuration to chat an assistant.
+The list of queries / chats to chat an assistant
+
+​
+messages
+object[]
+required
+The MessageModel describes the format of a message in a chat.
+
+
+Hide child attributes
+
+​
+messages.role
+string
+Role of the message such as 'user' or 'assistant'
+
+​
+messages.content
+string
+Content of the message
+
+​
+stream
+boolean
+default:
+false
+If false, the assistant will return a single JSON response. If true, the assistant will return a stream of responses.
+
+​
+model
+enum<string>
+default:
+gpt-4o
+The large language model to use for answer generation
+
+Available options: gpt-4o, claude-3-5-sonnet 
+​
+filter
+object
+Optionally filter which documents can be retrieved using the following metadata fields.
+
+​
+json_response
+boolean
+default:
+false
+If true, the assistant will be instructed to return a JSON response. Cannot be used with streaming.
+
+​
+include_highlights
+boolean
+default:
+false
+If true, the assistant will be instructed to return highlights from the referenced documents that support its response.
+
+Response
+200
+
+200
+application/json
+Search request successful.
+The ChatModel describes the response format of a chat request from the citation api.
+
+​
+id
+string
+​
+finish_reason
+enum<string>
+Available options: stop, length, content_filter, function_call 
+​
+message
+object
+The MessageModel describes the format of a message in a chat.
+
+
+Hide child attributes
+
+​
+message.role
+string
+Role of the message such as 'user' or 'assistant'
+
+​
+message.content
+string
+Content of the message
+
+​
+model
+string
+​
+citations
+object[]
+The CitationModel describes a single cited source returned by a chat request.
+
+
+Hide child attributes
+
+​
+citations.position
+integer
+The index position of the citation in the complete text response.
+
+​
+citations.references
+object[]
+The ReferenceModel describes a single reference in a citation.
+
+
+Show child attributes
+
+​
+usage
+object
+The UsageModel describes the usage of a chat completion.
+
+
+Hide child attributes
+
+​
+usage.prompt_tokens
+integer
+​
+usage.completion_tokens
+integer
+​
+usage.total_tokens
+integer

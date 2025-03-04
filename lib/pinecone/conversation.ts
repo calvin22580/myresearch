@@ -1,5 +1,5 @@
-import { Message } from '@/db/schema';
-import { PineconeAssistantMessage } from './types';
+import { Message, KnowledgeDomain } from './types';
+import { getKnowledgeDomainSystemPrompt } from './knowledge-domains';
 
 // Default context depth if not specified by the user
 const DEFAULT_CONTEXT_DEPTH = 10;
@@ -9,9 +9,9 @@ const MAX_CONTEXT_DEPTH = 50;
 /**
  * Converts a database message to the format expected by Pinecone Assistant API
  */
-export function convertToPineconeMessage(message: Message): PineconeAssistantMessage {
+export function convertToPineconeMessage(message: Message): Message {
   return {
-    role: message.role as 'user' | 'assistant', // Type assertion as we know these are the only values in our schema
+    role: message.role as 'user' | 'assistant' | 'system',
     content: message.content,
   };
 }
@@ -22,7 +22,7 @@ export function convertToPineconeMessage(message: Message): PineconeAssistantMes
 export function formatConversationHistory(
   messages: Message[],
   contextDepth?: number
-): PineconeAssistantMessage[] {
+): Message[] {
   // Apply context depth limits
   const effectiveDepth = Math.min(
     contextDepth || DEFAULT_CONTEXT_DEPTH,
@@ -35,13 +35,13 @@ export function formatConversationHistory(
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .slice(-effectiveDepth);
   
-  return recentMessages.map(convertToPineconeMessage);
+  return recentMessages;
 }
 
 /**
  * Creates a simple system message to guide the assistant's behavior
  */
-export function createSystemMessage(knowledgeDomain?: string): PineconeAssistantMessage {
+export function createSystemMessage(knowledgeDomain?: string): Message {
   let content = 'You are My-Research.ai, a knowledgeable assistant specializing in providing accurate information with proper citations.';
   
   if (knowledgeDomain) {
@@ -57,15 +57,41 @@ export function createSystemMessage(knowledgeDomain?: string): PineconeAssistant
 }
 
 /**
- * Prepares the complete message payload for the Pinecone API
+ * Prepares messages for the Pinecone Assistant API
+ * 
+ * @param messages - Array of conversation messages
+ * @param contextDepth - Number of messages to include in context
+ * @param knowledgeDomain - Knowledge domain for system prompt
+ * @returns Formatted messages for Pinecone API
  */
 export function preparePineconeMessages(
-  messages: Message[],
-  contextDepth?: number,
-  knowledgeDomain?: string
-): PineconeAssistantMessage[] {
-  const systemMessage = createSystemMessage(knowledgeDomain);
-  const conversationHistory = formatConversationHistory(messages, contextDepth);
+  messages: ConversationMessage[],
+  contextDepth: number = 10,
+  knowledgeDomain: KnowledgeDomain = 'building_regulations'
+): Message[] {
+  // Get system prompt for the knowledge domain
+  const systemPrompt = getKnowledgeDomainSystemPrompt(knowledgeDomain);
   
-  return [systemMessage, ...conversationHistory];
+  // Start with system message
+  const formattedMessages: Message[] = [
+    { role: 'system', content: systemPrompt }
+  ];
+  
+  // Sort messages by creation time
+  const sortedMessages = [...messages].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+  
+  // Limit to the most recent messages based on context depth
+  const recentMessages = sortedMessages.slice(-contextDepth);
+  
+  // Format messages for Pinecone
+  recentMessages.forEach(message => {
+    formattedMessages.push({
+      role: message.role as 'user' | 'assistant',
+      content: message.content
+    });
+  });
+  
+  return formattedMessages;
 } 

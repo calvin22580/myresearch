@@ -1,47 +1,52 @@
-import { 
-  PineconeCitation, 
-  PineconeCitationReference,
-  formatCitationHighlight
-} from './types';
+import { nanoid } from 'nanoid';
+import { Citation, FormattedCitation } from './types';
 
 /**
- * Interface for a processed citation ready for UI display
+ * Parses citations from Pinecone Assistant API response
+ * and formats them for frontend display
+ * 
+ * @param citations - Array of citations from Pinecone
+ * @returns Array of formatted citations for frontend
  */
-export interface FormattedCitation {
-  id: string;
-  number: number;
-  position: number;
-  fileName: string;
-  fileId: string;
-  pages: number[];
-  highlight: string;
-  sourceUrl?: string;
+export function parseCitations(citations: Citation[] = []): FormattedCitation[] {
+  if (!citations || citations.length === 0) {
+    return [];
+  }
+  
+  return citations.map(citation => {
+    // Generate a unique ID for the citation
+    const id = nanoid();
+    
+    // Extract document title from metadata if available
+    const documentTitle = citation.metadata?.title || 
+                          citation.metadata?.name || 
+                          `Document ${citation.document_id.substring(0, 8)}`;
+    
+    return {
+      id,
+      text: citation.text,
+      documentId: citation.document_id,
+      documentTitle,
+      startPosition: citation.start,
+      endPosition: citation.end,
+      metadata: citation.metadata
+    };
+  });
 }
 
 /**
- * Parse raw Pinecone citations into a format suitable for UI rendering
+ * Formats a citation for display in the UI
+ * 
+ * @param citation - Formatted citation
+ * @param index - Citation index for numbering
+ * @returns Formatted citation string
  */
-export function parseCitations(
-  citations: PineconeCitation[]
-): FormattedCitation[] {
-  // Sort citations by position for consistent numbering
-  const sortedCitations = [...citations].sort((a, b) => a.position - b.position);
-  
-  return sortedCitations.map((citation, index) => {
-    // Find the primary reference (first one if multiple)
-    const reference: PineconeCitationReference = citation.references[0];
-    
-    return {
-      id: `citation-${index + 1}`,
-      number: index + 1, // 1-based citation numbering for display
-      position: citation.position,
-      fileName: reference.file.name,
-      fileId: reference.file.id,
-      pages: reference.pages,
-      highlight: formatCitationHighlight(reference.highlight),
-      sourceUrl: reference.file.signed_url,
-    };
-  });
+export function formatCitationForDisplay(
+  citation: FormattedCitation,
+  index: number
+): string {
+  const documentName = citation.documentTitle || `Document ${citation.documentId.substring(0, 8)}`;
+  return `[${index + 1}] ${documentName}`;
 }
 
 /**
@@ -91,15 +96,4 @@ export function groupCitationsByFile(
     }, 
     {}
   );
-}
-
-/**
- * Prepares a citation to be displayed in a tooltip or detail view
- */
-export function formatCitationForDisplay(citation: FormattedCitation): string {
-  const pageText = citation.pages.length > 1 
-    ? `Pages ${citation.pages.join(', ')}` 
-    : `Page ${citation.pages[0]}`;
-    
-  return `${citation.fileName} - ${pageText}\n\n"${citation.highlight}"`;
 } 

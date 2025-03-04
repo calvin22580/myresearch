@@ -1,62 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { makePineconeRequest } from '@/lib/pinecone/client';
+import { nanoid } from 'nanoid';
+import { getPineconeClient } from '@/lib/pinecone/client';
 import { 
   PineconeAssistantRequest, 
-  PineconeAssistantResponse
+  PineconeAssistantResponse,
+  KnowledgeDomain
 } from '@/lib/pinecone/types';
 import { preparePineconeMessages } from '@/lib/pinecone/conversation';
-import { getPineconeAssistantName } from '@/lib/pinecone/knowledge-domains';
-import { trackTokenUsage } from '@/lib/pinecone/token-counter';
 import { parseCitations } from '@/lib/pinecone/citation-parser';
-import { checkCreditAvailability } from '@/lib/pinecone/token-counter';
-import { estimateTokenCount } from '@/lib/pinecone/token-counter';
-import { nanoid } from 'nanoid';
+import { 
+  estimateTokenCount, 
+  checkCreditAvailability,
+  trackTokenUsage
+} from '@/lib/pinecone/token-counter';
+import { getPineconeAssistantName } from '@/lib/pinecone/knowledge-domains';
 
 // Configure Edge runtime
 export const runtime = 'edge';
 
-// Create a simple fetch-based API function for working with conversations in Edge runtime
+/**
+ * Fetches messages for a conversation
+ */
 async function fetchConversationMessages(conversationId: string) {
   try {
-    // Use internal API routes to fetch conversation data
-    // This avoids direct Drizzle/Postgres usage in Edge
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/conversations/${conversationId}/messages`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          // Pass along auth info
-          'Cookie': 'edge-api-call=true', // This is just a marker for debugging
-        }
-      }
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/conversations/${conversationId}/messages`,
+      { method: 'GET' }
     );
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch conversation: ${response.status}`);
+      throw new Error(`Failed to fetch messages: ${response.status}`);
     }
     
     const data = await response.json();
     return data.messages || [];
   } catch (error) {
     console.error('Error fetching conversation messages:', error);
-    throw error;
+    return [];
   }
 }
 
-// Function to save a message using the API
-async function saveMessage(conversationId: string, role: 'user' | 'assistant', content: string) {
+/**
+ * Saves a message to a conversation
+ */
+async function saveMessage(
+  conversationId: string, 
+  role: 'user' | 'assistant', 
+  content: string
+) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/conversations/${conversationId}/messages`,
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/conversations/${conversationId}/messages`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content,
-          role
+          role,
+          content
         })
       }
     );
@@ -65,131 +66,114 @@ async function saveMessage(conversationId: string, role: 'user' | 'assistant', c
       throw new Error(`Failed to save message: ${response.status}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    return data.messageId;
   } catch (error) {
     console.error('Error saving message:', error);
     throw error;
   }
 }
 
+// Handle POST requests to /api/assistant
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
+    // Get authenticated user
     const { userId } = auth();
+    
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-
+    
     // Parse request body
     const { 
-      messageContent, 
       conversationId, 
-      knowledgeDomainId,
+      message, 
+      knowledgeDomain = 'building_regulations' as KnowledgeDomain,
       contextDepth = 10
     } = await request.json();
-
-    if (!messageContent || !conversationId) {
+    
+    // Validate required fields
+    if (!conversationId || !message) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: conversationId and message' },
         { status: 400 }
       );
     }
-
-    // Check credit availability before processing
-    const estimatedTokens = estimateTokenCount(messageContent) * 2; // Rough estimate
+    
+    // Estimate token usage for credit check
+    const estimatedTokens = estimateTokenCount(message) * 10; // Rough estimate
+    
+    // Check if user has sufficient credits
     const creditCheck = await checkCreditAvailability(userId, estimatedTokens);
-
+    
     if (!creditCheck.hasCredits) {
-      return NextResponse.json(
-        { 
-          error: 'Insufficient credits',
-          availableCredits: creditCheck.availableCredits,
-          estimatedCost: creditCheck.estimatedCost
-        },
-        { status: 402 }
-      );
-    }
-
-    // For Edge Runtime, use API calls instead of direct DB access
-    try {
-      // Save the user message
-      const messageId = nanoid();
-      await saveMessage(conversationId, 'user', messageContent);
-      
-      // Fetch conversation messages
-      const conversationMessages = await fetchConversationMessages(conversationId);
-      
-      // Add the current message for processing
-      const allMessages = [
-        ...conversationMessages,
-        {
-          id: messageId,
-          conversationId,
-          content: messageContent,
-          role: 'user',
-          createdAt: new Date().toISOString()
-        }
-      ];
-
-      // Process with Pinecone
-      const assistantName = getPineconeAssistantName(knowledgeDomainId);
-      const pineconeMessages = preparePineconeMessages(
-        allMessages, 
-        contextDepth,
-        knowledgeDomainId
-      );
-
-      // Prepare request for Pinecone
-      const pineconeRequest: PineconeAssistantRequest = {
-        messages: pineconeMessages,
-        model: 'gpt-4o',
-        include_highlights: true,
-        stream: false,
-      };
-
-      // Make request to Pinecone
-      const assistantResponse = await makePineconeRequest<PineconeAssistantResponse>(
-        assistantName,
-        pineconeRequest
-      );
-
-      // Parse citations
-      const formattedCitations = parseCitations(assistantResponse.citations || []);
-
-      // Save assistant response
-      const assistantMessageId = nanoid();
-      await saveMessage(conversationId, 'assistant', assistantResponse.content);
-
-      // Track token usage and deduct credits
-      const usageResult = await trackTokenUsage(
-        userId, 
-        assistantMessageId, 
-        assistantResponse.usage
-      );
-
-      // Return response
       return NextResponse.json({
-        message: assistantResponse.content,
-        messageId: assistantMessageId,
-        citations: formattedCitations,
-        tokenUsage: assistantResponse.usage,
-        creditUsage: usageResult.creditUsage,
-        remainingCredits: usageResult.remainingCredits
-      });
-    } catch (error) {
-      console.error('Error processing assistant request:', error);
-      return NextResponse.json(
-        { error: 'Failed to process request' },
-        { status: 500 }
-      );
+        error: 'Insufficient credits',
+        availableCredits: creditCheck.availableCredits,
+        estimatedCost: creditCheck.estimatedCost,
+        type: 'credit'
+      }, { status: 403 });
     }
+    
+    // Save user message
+    const userMessageId = nanoid();
+    await saveMessage(conversationId, 'user', message);
+    
+    // Fetch conversation history
+    const messages = await fetchConversationMessages(conversationId);
+    
+    // Prepare messages for Pinecone
+    const pineconeMessages = preparePineconeMessages(
+      messages,
+      contextDepth,
+      knowledgeDomain
+    );
+    
+    // Get the appropriate assistant name based on domain
+    const assistantName = getPineconeAssistantName(knowledgeDomain);
+    
+    // Create request payload
+    const payload: PineconeAssistantRequest = {
+      messages: pineconeMessages,
+      stream: false,
+      include_highlights: true
+    };
+    
+    // Make request to Pinecone
+    const pc = getPineconeClient();
+    const assistant = pc.Assistant(assistantName);
+    const response = await assistant.chat(payload);
+    
+    // Parse citations
+    const formattedCitations = parseCitations(response.citations || []);
+    
+    // Save assistant response
+    const assistantMessageId = nanoid();
+    await saveMessage(conversationId, 'assistant', response.content);
+    
+    // Track token usage and deduct credits
+    const usageResult = await trackTokenUsage(
+      userId, 
+      assistantMessageId, 
+      response.usage
+    );
+    
+    // Return response
+    return NextResponse.json({
+      message: response.content,
+      messageId: assistantMessageId,
+      citations: formattedCitations,
+      tokenUsage: response.usage,
+      creditUsage: usageResult.creditUsage,
+      remainingCredits: usageResult.remainingCredits
+    });
   } catch (error) {
     console.error('Assistant API Error:', error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: error instanceof Error ? error.message : 'An unknown error occurred' },
       { status: 500 }
     );
   }

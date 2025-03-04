@@ -1,74 +1,77 @@
 import { Message } from '@/db/schema';
 import { FormattedCitation } from '@/lib/pinecone/citation-parser';
-import { KnowledgeDomain } from '@/lib/knowledge-domains';
-import { PineconeUsage } from '@/lib/pinecone/types';
+import { KnowledgeDomain, TokenUsage } from '@/lib/pinecone/types';
 
 // Assistant Chat Interface Types
 
 /**
- * Common message interface for UI rendering
+ * Message in a conversation
  */
 export interface ChatMessage {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
-  createdAt: Date;
-  isLoading?: boolean;
-  isError?: boolean;
+  role: 'user' | 'assistant' | 'system';
+  createdAt: string;
   citations?: FormattedCitation[];
+  isLoading?: boolean;
 }
 
 /**
- * Error states for message processing
+ * Error types for assistant interactions
  */
 export type MessageErrorType = 
-  | 'api'
-  | 'network'
-  | 'credit'
-  | 'permission'
-  | 'server'
-  | 'unknown';
+  | 'api'       // General API error
+  | 'credit'    // Credit limit reached
+  | 'permission' // Permission denied
+  | 'server'    // Server error
+  | 'network'   // Network error
+  | 'fetch'     // Error fetching data
+  | 'parse'     // Error parsing data
+  | 'unknown';  // Unknown error
 
 /**
- * Parameters for sending a message to the assistant
+ * Parameters for sending a message
  */
 export interface SendMessageParams {
-  conversationId: string;
   messageContent: string;
-  knowledgeDomainId?: string;
+  conversationId?: string;
+  knowledgeDomain?: KnowledgeDomain;
   contextDepth?: number;
 }
 
 /**
- * Successful response from the assistant API
+ * Response from assistant API
  */
 export interface AssistantResponse {
   message: string;
   messageId: string;
   citations: FormattedCitation[];
-  tokenUsage: PineconeUsage;
+  tokenUsage: TokenUsage;
   creditUsage: number;
-  remainingCredits: number | null;
+  remainingCredits: number;
 }
 
 /**
- * Error response from the assistant API
+ * Error response from assistant API
  */
 export interface AssistantErrorResponse {
   error: string;
+  type?: MessageErrorType;
   availableCredits?: number;
   estimatedCost?: number;
-  type?: MessageErrorType;
 }
 
 /**
- * Assistant state for React hooks
+ * State for assistant hook
  */
 export interface AssistantState {
-  messages: ChatMessage[];
   isLoading: boolean;
   error: AssistantErrorResponse | null;
-  selectedDomain: KnowledgeDomain | null;
+  messages: ChatMessage[];
+  selectedDomain?: {
+    id: KnowledgeDomain;
+    name: string;
+  };
   contextDepth: number;
   credits: {
     available: number;
