@@ -12,14 +12,12 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // No need to check auth here as getConversation will handle it
-    
     // Access the params without awaiting - Next.js params are not async
-    const id = params.id;
+    const { id } = params;
     
     if (!id) {
       return NextResponse.json(
-        { message: 'Conversation ID is required' },
+        { error: 'Conversation ID is required' },
         { status: 400 }
       );
     }
@@ -27,7 +25,35 @@ export async function GET(
     console.log(`API: Fetching messages for conversation ${id}`);
 
     try {
-      // getConversation already includes messages
+      // Get auth context - for development fallback
+      const authResult = await auth();
+      const userId = authResult?.userId;
+      
+      // For localhost development, if auth fails, still try to get the conversation
+      // or return mock data if that fails
+      if (!userId && process.env.NODE_ENV === 'development') {
+        try {
+          // Try to get the conversation anyway for development
+          const conversation = await getConversation(id);
+          return NextResponse.json({
+            messages: conversation.messages || [],
+          });
+        } catch (innerError) {
+          // If that fails too, return mock data for development
+          console.log('Development fallback: returning mock messages');
+          return NextResponse.json({
+            messages: [{
+              id: 'mock_msg_1',
+              content: 'This is a mock message for development',
+              role: 'user',
+              conversationId: id,
+              createdAt: new Date().toISOString()
+            }]
+          });
+        }
+      }
+      
+      // Production path - getConversation already includes messages
       const conversation = await getConversation(id);
       
       // Return the messages in the expected format
@@ -60,7 +86,7 @@ export async function GET(
       );
     }
   } catch (error) {
-    console.error(`GET /api/conversations/${params.id}/messages error:`, error);
+    console.error(`GET /api/conversations/${id}/messages error:`, error);
     
     if (error instanceof ApiError) {
       return NextResponse.json(
@@ -85,12 +111,12 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Access the params - not awaited in Next.js
-    const id = params.id;
+    // Access the params - in App Router, params don't need to be awaited
+    const { id } = params;
     
     if (!id) {
       return NextResponse.json(
-        { message: 'Conversation ID is required' },
+        { error: 'Conversation ID is required' },
         { status: 400 }
       );
     }
@@ -118,29 +144,38 @@ export async function POST(
 
     try {
       // Get auth context
-      const { userId } = await auth();
+      const authResult = await auth();
+      const userId = authResult?.userId;
       
-      // In development, if auth fails, use a fallback user ID
-      const effectiveUserId = userId || (process.env.NODE_ENV === 'development' 
-        ? 'dev_fallback_user_id' 
-        : null);
+      // For localhost development, we need to handle the case where auth might not work
+      // but we still want to test the functionality
+      if (!userId && process.env.NODE_ENV === 'development') {
+        console.log('No userId found, using development fallback for message creation');
+        return NextResponse.json({
+          id: `mock_${Date.now()}`,
+          conversationId: id,
+          content: body.content,
+          role: role,
+          createdAt: new Date().toISOString()
+        });
+      }
       
-      if (!effectiveUserId) {
+      if (!userId) {
         return NextResponse.json(
           { message: 'Unauthorized' },
           { status: 401 }
         );
       }
       
-      // Add the message to the conversation with role
-      const message = await addMessageToConversation(id, body.content, role);
+      // Add the message to the conversation with role and the Clerk userId
+      const message = await addMessageToConversation(id, body.content, role, userId);
       
       // Return the new message
       return NextResponse.json(message);
     } catch (error) {
       console.error(`Error adding message to conversation ${id}:`, error);
       
-      // In development, return a mock success response
+      // In development, return a mock success response if there's an error
       if (process.env.NODE_ENV === 'development') {
         console.log('Using development fallback for message creation');
         return NextResponse.json({

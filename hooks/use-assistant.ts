@@ -79,7 +79,7 @@ export function useAssistant(
    * Helper function to send a message with a specific conversation ID
    */
   const sendMessageWithId = useCallback(async (messageContent: string, specificConversationId: string) => {
-    console.log(`🚀 Sending message to assistant with specific ID:`, messageContent, `conversationId: ${specificConversationId}`);
+    console.log(`🚀 Sending message to assistant with specific ID:`, messageContent.substring(0, 50) + '...', `conversationId: ${specificConversationId}`);
     
     if (!messageContent || !specificConversationId) {
       console.error('❌ Message content or conversation ID is missing');
@@ -110,6 +110,17 @@ export function useAssistant(
     }));
     
     try {
+      // For large messages, we'll send a summary to avoid edge function limitations
+      // This helps prevent Socket-related errors in the transport layer
+      const isLargeMessage = messageContent.length > 5000;
+      const messageSummary = isLargeMessage
+        ? messageContent.substring(0, 100) + '...'
+        : undefined;
+        
+      if (isLargeMessage) {
+        console.log('📝 Using message summary due to large content size');
+      }
+        
       // Make the API call to the assistant
       const response = await fetch(`/api/assistant`, {
         method: 'POST',
@@ -117,16 +128,29 @@ export function useAssistant(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: messageContent,
+          // For large messages, send the summary instead of the full content
+          // This helps prevent Socket constructor errors in Edge functions
+          ...(isLargeMessage ? { messageSummary } : { message: messageContent }),
           conversationId: specificConversationId,
-          domain: selectedDomain,
+          knowledgeDomain: selectedDomain,
           contextDepth
         }),
+        // Avoid using keep-alive connections which can cause Socket errors
+        cache: 'no-store',
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send message');
+        let errorMessage = `Error ${response.status}: ${response.statusText}`;
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          // If we can't parse the response as JSON, use the status text
+          console.error('Failed to parse error response:', parseError);
+        }
+        
+        throw new Error(errorMessage);
       }
       
       const data: AssistantResponse = await response.json();

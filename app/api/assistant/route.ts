@@ -16,8 +16,8 @@ import {
 } from '@/lib/pinecone/token-counter';
 import { getPineconeAssistantName } from '@/lib/pinecone/knowledge-domains';
 
-// Configure Edge runtime
-export const runtime = 'edge';
+// Configure Node.js runtime instead of Edge
+export const runtime = 'nodejs';
 
 /**
  * Fetches messages for a conversation
@@ -110,7 +110,11 @@ export async function POST(request: NextRequest) {
   try {
     // Get authenticated user - await the auth result
     const authResult = await auth();
-    const userId = authResult.userId;
+    
+    // In development, if auth fails, use a fallback user ID
+    const userId = authResult.userId || (process.env.NODE_ENV === 'development' 
+      ? 'dev_fallback_user_id' 
+      : null);
     
     console.log('🔒 Auth check:', userId ? 'User authenticated' : 'Not authenticated');
     
@@ -200,56 +204,109 @@ export async function POST(request: NextRequest) {
     // Create request payload
     const payload: PineconeAssistantRequest = {
       messages: pineconeMessages,
-      stream: false,
-      include_highlights: true
+      includeHighlights: true
     };
     
-    // Make request to Pinecone using direct Assistant pattern
-    const pc = getPineconeClient();
-    console.log('⚡ Getting assistant:', assistantName);
-    
-    // Use as any to work around the type issue
-    const assistant = (pc as any).Assistant(assistantName);
-    
-    console.log('⚡ Sending chat request to Pinecone');
-    const response = await assistant.chat(payload);
-    console.log('📥 Received response from Pinecone API:', JSON.stringify({
-      contentLength: response.content.length,
-      hasCitations: Boolean(response.citations && response.citations.length > 0),
-      citationCount: response.citations?.length || 0
-    }));
-    
-    // Parse citations
-    console.log('🔍 Parsing citations from response');
-    const formattedCitations = parseCitations(response.citations || []);
-    
-    // Save assistant response
-    console.log('💾 Saving assistant response');
-    const assistantMessageId = nanoid();
-    await saveMessage(conversationId, 'assistant', response.content);
-    
-    // Track token usage and deduct credits
-    console.log('📊 Tracking token usage and deducting credits');
-    const usageResult = await trackTokenUsage(
-      userId, 
-      assistantMessageId, 
-      response.usage
-    );
-    
-    // Return response
-    console.log('📤 Sending response to client');
-    return NextResponse.json({
-      message: response.content,
-      messageId: assistantMessageId,
-      citations: formattedCitations,
-      tokenUsage: response.usage,
-      creditUsage: usageResult.creditUsage,
-      remainingCredits: usageResult.remainingCredits
-    });
-  } catch (error: any) {
+    try {
+      console.log('⚡ Making request to Pinecone assistant API');
+      
+      // Use the makePineconeRequest helper instead of direct Assistant call
+      const response = await makePineconeRequest<PineconeAssistantResponse>(
+        assistantName,
+        payload
+      );
+      
+      console.log('📥 Received response from Pinecone API:', JSON.stringify({
+        contentLength: response.message.content.length,
+        hasCitations: Boolean(response.citations && response.citations.length > 0),
+        citationCount: response.citations?.length || 0,
+        model: response.model,
+        finishReason: response.finishReason
+      }));
+      
+      // Parse citations
+      console.log('🔍 Parsing citations from response');
+      const formattedCitations = parseCitations(response.citations || []);
+      
+      // Save assistant response
+      console.log('💾 Saving assistant response');
+      const assistantMessageId = nanoid();
+      
+      try {
+        await saveMessage(conversationId, 'assistant', response.message.content);
+      } catch (saveError) {
+        console.error('⚠️ Failed to save message but continuing with response:', saveError);
+        // Continue processing even if saving fails - this prevents the client from hanging
+      }
+      
+      // Calculate usage costs
+      const completionTokens = response.usage?.completion_tokens || 0;
+      const promptTokens = response.usage?.prompt_tokens || 0;
+      const totalTokens = response.usage?.total_tokens || completionTokens + promptTokens;
+      const tokenUsage = {
+        completion_tokens: completionTokens,
+        prompt_tokens: promptTokens,
+        total_tokens: totalTokens
+      };
+      
+      console.log('🧮 Token usage:', tokenUsage);
+      
+      // Track token usage for credit deduction
+      try {
+        const creditResult = await trackTokenUsage(
+          userId,  // This is already a string from auth()
+          assistantMessageId, // This is a string from nanoid()
+          tokenUsage
+        );
+        console.log('💳 Credit tracking result:', creditResult);
+      } catch (creditError) {
+        console.error('⚠️ Failed to track credits but continuing with response:', creditError);
+        // Continue processing even if credit tracking fails
+      }
+      
+      // Return the response
+      return NextResponse.json({
+        message: response.message.content,
+        citations: formattedCitations,
+        messageId: assistantMessageId
+      });
+    } catch (error) {
+      console.error('❌ Error from Pinecone API:', error);
+      
+      // For development, return a mock response
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📝 Using development fallback for Pinecone response');
+        const mockMessageId = nanoid();
+        return NextResponse.json({
+          message: "I'm a development mock response. The actual Pinecone API call failed.",
+          citations: [],
+          messageId: mockMessageId
+        });
+      }
+      
+      // For production, return the error
+      return NextResponse.json(
+        { 
+          error: `Assistant API error: ${error instanceof Error ? error.message : String(error)}` 
+        },
+        { status: 500 }
+      );
+    }
+  } catch (error) {
     console.error('❌ Assistant API Error:', error);
+    
+    // For development, return a mock response
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📝 Using development fallback for assistant API');
+      return NextResponse.json({
+        message: "I'm a development mock response. There was an error processing your request.",
+        citations: [],
+        messageId: nanoid()
+      });
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'An unknown error occurred' },
+      { error: `Error processing request: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     );
   }

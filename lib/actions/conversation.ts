@@ -11,6 +11,7 @@ import { generateErrorMessage } from '@/lib/utils';
 import { rateLimit } from '@/lib/rate-limit';
 import { getKnowledgeDomain } from '@/lib/pinecone/knowledge-domains';
 import { ensureUserExists } from '@/lib/actions/user';
+import { getUserByClerkId } from '@/lib/repositories/user-repository';
 
 /**
  * Creates a new conversation with a default title based on the first message.
@@ -411,17 +412,22 @@ export async function deleteConversation(id: string) {
  * @param conversationId The conversation ID
  * @param content The message content
  * @param role The message role (user or assistant)
+ * @param clerkId Optional Clerk ID to use for user lookup
  * @returns The newly created message
  */
 export async function addMessageToConversation(
   conversationId: string, 
   content: string,
-  role: 'user' | 'assistant' = 'user'
+  role: 'user' | 'assistant' = 'user',
+  clerkId?: string
 ) {
   try {
-    // Get the database user
-    const user = await ensureUserExists();
-    const userId = user.id;
+    // Get the database user, using clerkId if provided
+    const user = clerkId 
+      ? await getUserByClerkId(clerkId) 
+      : await ensureUserExists();
+      
+    const userId = user?.id;
 
     if (!userId) {
       throw new Error('Unauthorized');

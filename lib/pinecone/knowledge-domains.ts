@@ -6,7 +6,7 @@ import { KnowledgeDomain } from './types';
  */
 export const KNOWLEDGE_DOMAINS = {
   building_regulations: {
-    id: 'building_regulations',
+    id: 'buildingregulations',
     name: 'Building Regulations',
     description: 'UK building regulations, codes, and standards',
     assistantName: env.ASSISTANT_NAME_BUILDING

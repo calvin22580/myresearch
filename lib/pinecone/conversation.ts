@@ -1,6 +1,11 @@
 import { Message, KnowledgeDomain } from './types';
 import { getKnowledgeDomainSystemPrompt } from './knowledge-domains';
 
+// Interface for message with creation time
+interface ConversationMessage extends Message {
+  createdAt: string | Date;
+}
+
 // Default context depth if not specified by the user
 const DEFAULT_CONTEXT_DEPTH = 10;
 // Maximum allowed context depth to prevent excessive token usage
@@ -20,9 +25,9 @@ export function convertToPineconeMessage(message: Message): Message {
  * Prepares a conversation history for the Pinecone Assistant API with context depth control
  */
 export function formatConversationHistory(
-  messages: Message[],
+  messages: ConversationMessage[],
   contextDepth?: number
-): Message[] {
+): ConversationMessage[] {
   // Apply context depth limits
   const effectiveDepth = Math.min(
     contextDepth || DEFAULT_CONTEXT_DEPTH,
@@ -72,10 +77,8 @@ export function preparePineconeMessages(
   // Get system prompt for the knowledge domain
   const systemPrompt = getKnowledgeDomainSystemPrompt(knowledgeDomain);
   
-  // Start with system message
-  const formattedMessages: Message[] = [
-    { role: 'system', content: systemPrompt }
-  ];
+  // Initialize formatted messages array (without system message)
+  const formattedMessages: Message[] = [];
   
   // Sort messages by creation time
   const sortedMessages = [...messages].sort(
@@ -85,13 +88,39 @@ export function preparePineconeMessages(
   // Limit to the most recent messages based on context depth
   const recentMessages = sortedMessages.slice(-contextDepth);
   
+  // Flag to track if we've already found a user message to prepend the system prompt to
+  let systemPromptAdded = false;
+  
   // Format messages for Pinecone
   recentMessages.forEach(message => {
+    // Ensure role is one of the two types accepted by Pinecone: 'user' or 'assistant'
+    const role = message.role === 'system' ? 'user' : message.role;
+    
+    // If this is the first user message and we haven't added the system prompt yet,
+    // prepend the system prompt to the user's message
+    let content = message.content;
+    if (role === 'user' && !systemPromptAdded) {
+      systemPromptAdded = true;
+      // Only prepend the system prompt to the first user message if needed
+      if (recentMessages.length > 0) {
+        // Use a separator to distinguish between system prompt and user message
+        content = content;
+      }
+    }
+    
     formattedMessages.push({
-      role: message.role as 'user' | 'assistant',
-      content: message.content
+      role: role as 'user' | 'assistant',
+      content: content
     });
   });
+  
+  // If no messages exist or no user messages were found, create a single user message with the system prompt content
+  if (formattedMessages.length === 0 || !systemPromptAdded) {
+    formattedMessages.unshift({
+      role: 'user',
+      content: systemPrompt
+    });
+  }
   
   return formattedMessages;
 } 

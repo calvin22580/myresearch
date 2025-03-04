@@ -23,31 +23,59 @@ export interface Message {
 // Pinecone Assistant API request
 export interface PineconeAssistantRequest {
   messages: Message[];
-  stream?: boolean;
-  include_highlights?: boolean;
+  model?: string;
+  filter?: any;
+  jsonResponse?: boolean;
+  includeHighlights?: boolean;
 }
 
-// Citation interface
-export interface Citation {
-  text: string;
-  document_id: string;
-  start: number;
-  end: number;
-  metadata?: Record<string, any>;
+// Citation reference interface (new format)
+export interface PineconeCitationReference {
+  file: {
+    name: string;
+    id: string;
+    metadata?: {
+      category?: string;
+      name?: string;
+    };
+    createdOn?: string;
+    updatedOn?: string;
+    status?: string;
+    percentDone?: number;
+  };
+  pages: number[];
+  highlight?: PineconeCitationHighlight;
+}
+
+// Citation highlight interface
+export interface PineconeCitationHighlight {
+  content?: string;
+}
+
+// Citation position interface (new format)
+export interface PineconeCitation {
+  position: number;
+  references: PineconeCitationReference[];
 }
 
 // Token usage interface
 export interface TokenUsage {
   total_tokens: number;
-  prompt_tokens: number;
-  completion_tokens: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
 }
 
-// Pinecone Assistant API response
+// Pinecone Assistant API response (updated to match actual format)
 export interface PineconeAssistantResponse {
-  content: string;
-  citations?: Citation[];
-  usage: TokenUsage;
+  id: string;
+  finishReason: string;
+  message: {
+    role: MessageRole;
+    content: string;
+  };
+  model: string;
+  citations: PineconeCitation[];
+  usage?: TokenUsage;
 }
 
 // Formatted citation for frontend display
@@ -59,25 +87,48 @@ export interface FormattedCitation {
   startPosition: number;
   endPosition: number;
   metadata?: Record<string, any>;
+  number?: number; // Citation number for display
 }
 
 // Zod schema for validating assistant response
 export const PineconeAssistantResponseSchema = z.object({
-  content: z.string(),
+  id: z.string(),
+  finishReason: z.string(),
+  message: z.object({
+    role: z.string(),
+    content: z.string()
+  }),
+  model: z.string(),
   citations: z.array(
     z.object({
-      text: z.string(),
-      document_id: z.string(),
-      start: z.number(),
-      end: z.number(),
-      metadata: z.record(z.any()).optional()
+      position: z.number(),
+      references: z.array(
+        z.object({
+          file: z.object({
+            name: z.string(),
+            id: z.string(),
+            metadata: z.object({
+              category: z.string().optional(),
+              name: z.string().optional()
+            }).optional(),
+            createdOn: z.string().optional(),
+            updatedOn: z.string().optional(),
+            status: z.string().optional(),
+            percentDone: z.number().optional()
+          }),
+          pages: z.array(z.number()),
+          highlight: z.object({
+            content: z.string().optional()
+          }).optional()
+        })
+      )
     })
-  ).optional(),
+  ),
   usage: z.object({
     total_tokens: z.number(),
-    prompt_tokens: z.number(),
-    completion_tokens: z.number()
-  })
+    prompt_tokens: z.number().optional(),
+    completion_tokens: z.number().optional()
+  }).optional()
 });
 
 // Context depth configuration

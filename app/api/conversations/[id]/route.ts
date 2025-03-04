@@ -42,7 +42,7 @@ export async function GET(
     
     return NextResponse.json(conversation);
   } catch (error) {
-    console.error(`GET /api/conversations/${params.id} error:`, error);
+    console.error(`GET /api/conversations/${id} error:`, error);
     
     if (error instanceof ApiError) {
       return NextResponse.json(
@@ -120,7 +120,7 @@ export async function PATCH(
       );
     }
   } catch (error) {
-    console.error(`PATCH /api/conversations/${params.id} error:`, error);
+    console.error(`PATCH /api/conversations/${id} error:`, error);
     
     if (error instanceof ApiError) {
       return NextResponse.json(
@@ -165,7 +165,7 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error(`DELETE /api/conversations/${params.id} error:`, error);
+    console.error(`DELETE /api/conversations/${id} error:`, error);
     
     if (error instanceof ApiError) {
       return NextResponse.json(

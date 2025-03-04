@@ -30,8 +30,9 @@ const nextConfig = {
     DATABASE_URL: process.env.DATABASE_URL,
   },
 
-  // Simple webpack configuration for Node.js module fallbacks
-  webpack: (config) => {
+  // Enhanced webpack configuration for Node.js module fallbacks
+  webpack: (config, { isServer }) => {
+    // Provide fallbacks for Node.js built-in modules
     config.resolve.fallback = { 
       fs: false,
       path: false,
@@ -40,8 +41,29 @@ const nextConfig = {
       net: false,
       tls: false,
       perf_hooks: false,
-      stream: false
+      stream: require.resolve('stream-browserify')
     };
+    
+    // Handle node: protocol imports
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'node:stream': require.resolve('stream-browserify'),
+      'node:buffer': require.resolve('buffer/'),
+      'node:util': require.resolve('util/'),
+      'node:events': require.resolve('events/'),
+      'node:string_decoder': require.resolve('string_decoder/'),
+      'node:process': require.resolve('process/browser'),
+    };
+    
+    // Add polyfill plugins if not in server context
+    if (!isServer) {
+      config.plugins.push(
+        new (require('webpack')).ProvidePlugin({
+          process: 'process/browser',
+          Buffer: ['buffer', 'Buffer'],
+        })
+      );
+    }
     
     return config;
   }

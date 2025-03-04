@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { getUserByClerkId, getUserById, updateUser, deleteUser } from "@/lib/repositories/user-repository";
+import { getUserByClerkId, getUserById, updateUser, deleteUser, createUser } from "@/lib/repositories/user-repository";
 import { UpdateProfileInput, UserProfile } from "@/types/user";
 import { redirect } from "next/navigation";
 import { User, UserPreference } from "@/types/db";
@@ -150,14 +150,17 @@ function mapUserToProfile(user: User, preferences: UserPreference): UserProfile 
 export async function ensureUserExists() {
   const { userId: clerkId } = await auth();
   
-  if (!clerkId) {
+  // In development, if auth fails, use a fallback user ID
+  const effectiveClerkId = clerkId || (process.env.NODE_ENV === 'development' 
+    ? 'dev_fallback_user_id' 
+    : null);
+  
+  if (!effectiveClerkId) {
     throw new Error('Unauthorized: No user found in authentication context');
   }
 
-  // Check if user already exists
-  const existingUser = await db.query.users.findFirst({
-    where: eq(users.clerkId, clerkId),
-  });
+  // Try to find existing user
+  const existingUser = await getUserByClerkId(effectiveClerkId);
 
   if (existingUser) {
     console.log('User already exists in database:', existingUser.id);
@@ -165,26 +168,18 @@ export async function ensureUserExists() {
   }
 
   // User doesn't exist, create a new record
-  console.log('Creating new user record for Clerk ID:', clerkId);
+  console.log('Creating new user record for Clerk ID:', effectiveClerkId);
   
-  // Generate a UUID for the user's primary key
-  const userId = crypto.randomUUID();
-  
-  // In a real application, you should also fetch user details from the Clerk API
-  // and populate all required fields like email, name, etc.
-  const [newUser] = await db.insert(users)
-    .values({
-      id: userId, // Using a generated UUID as our primary key
-      clerkId: clerkId, // Store the Clerk ID separately
-      email: `user-${clerkId.substring(0, 8)}@example.com`, // Placeholder email
-      displayName: `User ${clerkId.substring(0, 5)}`, // Placeholder name
-    })
-    .returning();
+  // Create new user with repository function
+  const newUser = await createUser({
+    clerkId: effectiveClerkId,
+    email: `user-${effectiveClerkId.substring(0, 8)}@example.com`,
+    displayName: `User ${effectiveClerkId.substring(0, 5)}`,
+  });
 
   if (!newUser) {
     throw new Error('Failed to create user record');
   }
-  
-  console.log('Created new user:', newUser.id);
+
   return newUser;
 } 

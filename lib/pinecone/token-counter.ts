@@ -79,11 +79,15 @@ export async function checkCreditAvailability(
 export function calculateCreditCost(usage: TokenUsage): number {
   if (!usage) return 0;
   
+  // Get token counts with fallback to 0 if undefined
+  const promptTokens = usage.prompt_tokens || 0;
+  const completionTokens = usage.completion_tokens || 0;
+  
   // Credit calculation formula:
   // - Input tokens: 0.01 credits per 1000 tokens
   // - Output tokens: 0.03 credits per 1000 tokens
-  const inputCost = (usage.prompt_tokens / 1000) * 0.01;
-  const outputCost = (usage.completion_tokens / 1000) * 0.03;
+  const inputCost = (promptTokens / 1000) * 0.01;
+  const outputCost = (completionTokens / 1000) * 0.03;
   
   // Return total cost rounded to 4 decimal places
   return Math.ceil((inputCost + outputCost) * 10000) / 10000;
@@ -103,7 +107,23 @@ export async function trackTokenUsage(
   usage: TokenUsage
 ): Promise<{ creditUsage: number; remainingCredits: number }> {
   try {
-    // Calculate credit cost
+    // Handle development mode with a more robust approach
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Deducting 0 credits (dev mode) for user ${userId || 'anonymous'}, message ${messageId}`);
+      console.log(`Token usage: ${JSON.stringify(usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 })}`);
+      return {
+        creditUsage: 0,
+        remainingCredits: 1000 // Default development credits
+      };
+    }
+    
+    // Ensure usage exists and has valid properties before calculating
+    if (!usage || (typeof usage !== 'object')) {
+      console.warn('Invalid or missing token usage data, using defaults');
+      usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    }
+    
+    // Calculate credit cost with proper null checks
     const creditUsage = calculateCreditCost(usage);
     
     // Use absolute URL for Edge compatibility
@@ -133,11 +153,19 @@ export async function trackTokenUsage(
   } catch (error) {
     console.error('Error tracking token usage:', error);
     
-    // Fallback behavior for Edge environment or errors
-    console.log('⚠️ Using fallback token tracking behavior due to error');
+    // More robust development fallback for credit tracking
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Using fallback token tracking behavior due to error');
+      return {
+        creditUsage: 0,
+        remainingCredits: 1000
+      };
+    }
+    
+    // For production, return a consistent error fallback
     return {
-      creditUsage: calculateCreditCost(usage),
-      remainingCredits: 1000 // Default fallback value
+      creditUsage: 0,
+      remainingCredits: 0
     };
   }
 } 

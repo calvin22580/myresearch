@@ -1,6 +1,7 @@
 import { db } from "../../db/db";
 import { users, userPreferences, userCredits } from "../../db/schema/prepare-schema";
 import { eq } from "drizzle-orm";
+import crypto from 'crypto';
 
 /**
  * Get a user by their Clerk ID

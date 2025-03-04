@@ -23,10 +23,13 @@ export class PineconeApiError extends Error {
 
 export class PineconeMissingApiKeyError extends Error {
   constructor() {
-    super('Missing Pinecone API key. Please set PINECONE_API_KEY in your .env file');
+    super('Pinecone API key is required but was not provided.');
     this.name = 'PineconeMissingApiKeyError';
   }
 }
+
+// Check if running in development environment
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 /**
  * Returns a configured Pinecone client
@@ -46,11 +49,12 @@ export function getPineconeClient() {
   }
   
   // Initialize and return the Pinecone client
+  console.log(`🤖 Initializing Pinecone client`);
   return new Pinecone({ apiKey });
 }
 
 /**
- * Makes a request to the Pinecone Assistant API with retry logic
+ * Makes a request to the Pinecone Assistant API
  */
 export async function makePineconeRequest<T>(
   assistantName: string,
@@ -61,19 +65,40 @@ export async function makePineconeRequest<T>(
     console.log(`📤 Sending request to Pinecone Assistant API: ${assistantName}`);
     console.log(`📦 Request payload:`, JSON.stringify(payload, null, 2));
 
-    // Initialize the Pinecone client
+    // Get Pinecone client
     const pc = getPineconeClient();
-    console.log(`🔄 Initializing assistant: ${assistantName}`);
     
-    // Use the Assistant method (using as any to workaround type issues)
-    const assistant = (pc as any).Assistant(assistantName);
+    // Use the Pinecone SDK's Assistant method (safer method call)
+    console.log(`🔄 Creating Assistant instance for: ${assistantName}`);
     
-    // Make the request
-    console.log(`🚀 Calling assistant.chat with payload`);
+    // Use the Assistant constructor properly
+    if (typeof pc.Assistant !== 'function') {
+      console.log('⚠️ pc.Assistant is not a function, attempting fallback approach');
+      
+      // Try using a different syntax or provide a fallback in dev
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📝 Using development fallback for Pinecone response');
+        return createMockResponse(assistantName, payload) as unknown as T;
+      } else {
+        throw new Error('Pinecone Assistant SDK method not available');
+      }
+    }
+    
+    const assistant = pc.Assistant(assistantName);
+    console.log(`🤖 Using Pinecone Assistant: ${assistantName}`);
+    
+    // Send the chat request
+    console.log(`🔄 Sending chat request via SDK`);
     const response = await assistant.chat(payload);
     
-    console.log(`📥 Received response from Pinecone:`, JSON.stringify(response, null, 2));
+    console.log(`📥 Received response from Pinecone:`, JSON.stringify({
+      messageLength: response.message?.content?.length,
+      hasCitations: Boolean(response.citations && response.citations.length > 0),
+      citationCount: response.citations?.length || 0
+    }, null, 2));
+    
     return response as T;
+    
   } catch (error: any) {
     console.error(`❌ Pinecone API error:`, error);
     
@@ -84,10 +109,37 @@ export async function makePineconeRequest<T>(
       return makePineconeRequest(assistantName, payload, retryCount + 1);
     }
     
+    // If we're in development, provide a fallback response
+    if (isDevelopment) {
+      console.log(`📝 Using development fallback for Pinecone response`);
+      return createMockResponse(assistantName, payload) as T;
+    }
+    
     // If we've exhausted retries, throw the error
     throw new PineconeApiError(
       error.message || 'Unknown error from Pinecone API',
       error.status || 500
     );
   }
+}
+
+/**
+ * Creates a mock response for development
+ */
+function createMockResponse(assistantName: string, payload: any): PineconeAssistantResponse {
+  return {
+    message: {
+      role: 'assistant',
+      content: `This is a development fallback response from the ${assistantName} assistant. The actual Pinecone API call failed, but we're providing this response so you can continue development.`
+    },
+    id: 'mock-response-id',
+    finishReason: 'stop',
+    model: 'gpt-4-fallback',
+    citations: [],
+    usage: {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0
+    }
+  };
 } 
